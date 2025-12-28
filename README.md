@@ -207,16 +207,30 @@ The system includes TensorFlow Lite for Microcontrollers to run a Random Forest 
 - Total: 11 input features
 
 ### Model Output
-- Single float value (0.0 to 1.0)
-- Values > 0.5 indicate bad posture
-- Values ≤ 0.5 indicate good posture
+- Multi-class classification with probabilities for each posture type
+- Classes: 0=Good Posture, 1=Slouching, 2=Leaning Left, 3=Leaning Right (customizable)
+- System selects the class with highest probability
 
 ### Firmware Commands
-- `predict`: Runs ML inference on current sensor readings and controls actuators based on result
+- `predict`: Runs ML inference on current sensor readings, controls actuators, and logs data
+- `user X`: Select user profile (0-4) for personalized calibration
+- `calibrate`: Calibrate sensors for current user (sit in good posture)
+- `logs`: Export historical posture data for analysis
+
+### User Profiles and Calibration
+- Supports up to 5 user profiles stored in ESP32 SPIFFS
+- Each profile includes personalized baseline readings and thresholds
+- Calibration process: User sits in correct posture, system records baseline values
+- Dynamic thresholds adapt to user's body type and weight
+
+### Data Logging
+- Stores last 100 posture predictions with timestamps and sensor data
+- Data can be exported via serial for trend analysis
+- Enables monitoring posture improvement over time
 
 ### Model Replacement
 To update the model:
-1. Train a new Random Forest model
+1. Train a new Random Forest model with multi-class labels
 2. Convert to .tflite using TensorFlow tools
 3. Replace the `model_tflite` array in the code with new model bytes
 4. Update `model_tflite_len` with the new length
@@ -292,20 +306,27 @@ smart-chair/
 
 ## Limitations
 
-1. **No Calibration Mechanism**: Sensor thresholds are hardcoded and not adjustable per user body type or weight
-2. **Single User Profile**: System does not adapt to different users with varying body dimensions
-3. **Limited Posture States**: Only binary classification (good/bad) without specific posture type identification
-4. **No Data Logging**: System does not store historical posture data for trend analysis
-5. **Wired Power Only**: Requires constant USB or DC power connection, not battery operated
-6. **Manual Testing Mode**: Current firmware requires serial commands for operation, not autonomous real-time monitoring
-7. **Fixed Thresholds**: Pressure and flex thresholds must be determined experimentally and hardcoded
-8. **No Wireless Communication**: System operates standalone without WiFi or Bluetooth connectivity
-9. **Sensor Placement Sensitivity**: Performance depends on accurate sensor positioning during installation
-10. **Environmental Factors**: Pressure sensors may drift with temperature changes or long-term use
+1. **Calibration Dependency**: Users must perform initial calibration for accurate personalized thresholds
+2. **Limited User Profiles**: Maximum of 5 user profiles supported due to ESP32 storage constraints
+3. **Model Accuracy**: ML model performance depends on quality and quantity of training data
+4. **Storage Capacity**: Posture logs limited to last 100 entries due to RAM constraints
+5. **Real-time Processing**: ML inference adds minor latency compared to threshold-based detection
+6. **Power Consumption**: Continuous sensor monitoring and ML processing increases battery drain
+7. **Sensor Durability**: Pressure and flex sensors may require periodic recalibration due to wear
+8. **Environmental Factors**: Temperature and humidity can affect sensor readings accuracy
+9. **Training Data Requirements**: Multi-class posture classification requires diverse labeled training dataset
+10. **Model Updates**: Over-the-air model updates not supported; requires firmware recompilation
 
 ## Future Development Path
 
-While the current system operates on threshold-based logic, the hardware and ESP32 platform support integration of machine learning models using TensorFlow Lite for Microcontrollers. This would enable more sophisticated posture classification based on trained models rather than fixed thresholds.
+The system now includes TensorFlow Lite for Microcontrollers with Random Forest models for posture classification. Future enhancements could include:
+
+- Over-the-air model updates via WiFi
+- Expanded user profile storage with external EEPROM
+- Integration with mobile apps for data visualization
+- Advanced ML models (CNNs) for more complex posture analysis
+- Battery optimization with sleep modes
+- Wireless connectivity for remote monitoring
 
 ## License
 

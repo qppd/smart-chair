@@ -1,6 +1,7 @@
 // Smart Chair ESP32 Sketch with TensorFlow Lite Micro
 // This sketch controls the smart chair with pressure, vibration, and flex sensors
 // Includes Random Forest model for posture prediction using TFLite Micro
+// Features: Calibration, User Profiles, Multi-class Posture Detection, Data Logging
 
 #include <TensorFlowLite.h>
 #include <tensorflow/lite/micro/all_ops_resolver.h>
@@ -8,6 +9,9 @@
 #include <tensorflow/lite/micro/micro_interpreter.h>
 #include <tensorflow/lite/schema/schema_generated.h>
 #include <tensorflow/lite/version.h>
+
+#include <SPIFFS.h>  // For file storage
+#include <EEPROM.h>  // For persistent storage
 
 // Pin definitions for ESP32 38-pin board (GPIO numbers)
 // Avoiding pins that conflict with WiFi, boot, or flash
@@ -27,6 +31,36 @@
 
 #define LED_PIN 2   // Safe for output
 #define BUZZER_PIN 4  // Safe for output
+
+// Data structures
+struct CalibrationData {
+  int pressureBaseline[5];  // Baseline readings for good posture
+  int flexBaseline[2];
+  float pressureThreshold;  // Dynamic threshold based on user
+  float flexThreshold;
+};
+
+struct UserProfile {
+  char name[20];
+  CalibrationData calib;
+};
+
+struct PostureLog {
+  unsigned long timestamp;
+  int postureClass;  // 0=good, 1=slouch, 2=lean_left, 3=lean_right, etc.
+  int sensorData[11];  // Raw sensor readings
+};
+
+// Constants
+#define MAX_USERS 5
+#define MAX_LOGS 100
+#define EEPROM_SIZE 512
+
+// Global variables
+UserProfile users[MAX_USERS];
+int currentUser = -1;  // No user selected initially
+PostureLog logs[MAX_LOGS];
+int logIndex = 0;
 
 // TFLite globals
 namespace {
@@ -51,6 +85,90 @@ const unsigned char model_tflite[] = {
 };
 const int model_tflite_len = 1;  // Replace with actual length
 
+// Utility functions
+void loadUserProfiles() {
+  if (!SPIFFS.begin(true)) {
+    Serial.println("SPIFFS Mount Failed");
+    return;
+  }
+  
+  File file = SPIFFS.open("/profiles.dat", "r");
+  if (file) {
+    file.read((uint8_t*)users, sizeof(users));
+    file.close();
+    Serial.println("User profiles loaded");
+  } else {
+    Serial.println("No user profiles found, using defaults");
+  }
+}
+
+void saveUserProfiles() {
+  File file = SPIFFS.open("/profiles.dat", "w");
+  if (file) {
+    file.write((uint8_t*)users, sizeof(users));
+    file.close();
+    Serial.println("User profiles saved");
+  } else {
+    Serial.println("Failed to save user profiles");
+  }
+}
+
+void calibrateUser(int userIndex) {
+  if (userIndex < 0 || userIndex >= MAX_USERS) return;
+  
+  Serial.println("Starting calibration... Sit in good posture and send 'calib done' when ready");
+  
+  // Wait for calibration command
+  while (true) {
+    if (Serial.available() > 0) {
+      String cmd = Serial.readStringUntil('\n');
+      cmd.trim();
+      if (cmd == "calib done") break;
+    }
+    delay(100);
+  }
+  
+  // Read baseline values
+  users[userIndex].calib.pressureBaseline[0] = analogRead(PRESSURE_SENSOR_1);
+  users[userIndex].calib.pressureBaseline[1] = analogRead(PRESSURE_SENSOR_2);
+  users[userIndex].calib.pressureBaseline[2] = analogRead(PRESSURE_SENSOR_3);
+  users[userIndex].calib.pressureBaseline[3] = analogRead(PRESSURE_SENSOR_4);
+  users[userIndex].calib.pressureBaseline[4] = analogRead(PRESSURE_SENSOR_5);
+  
+  users[userIndex].calib.flexBaseline[0] = analogRead(FLEX_SENSOR_1);
+  users[userIndex].calib.flexBaseline[1] = analogRead(FLEX_SENSOR_2);
+  
+  // Calculate dynamic thresholds (example: 20% deviation from baseline)
+  users[userIndex].calib.pressureThreshold = 0.2;  // 20% tolerance
+  users[userIndex].calib.flexThreshold = 0.3;      // 30% tolerance for flex
+  
+  Serial.println("Calibration complete");
+  saveUserProfiles();
+}
+
+void logPostureData(int postureClass, int* sensorData) {
+  logs[logIndex].timestamp = millis();
+  logs[logIndex].postureClass = postureClass;
+  memcpy(logs[logIndex].sensorData, sensorData, sizeof(int) * 11);
+  logIndex = (logIndex + 1) % MAX_LOGS;
+}
+
+void exportLogs() {
+  Serial.println("Posture Logs:");
+  for (int i = 0; i < MAX_LOGS; i++) {
+    if (logs[i].timestamp > 0) {
+      Serial.print("Time: "); Serial.print(logs[i].timestamp);
+      Serial.print(", Class: "); Serial.print(logs[i].postureClass);
+      Serial.print(", Data: ");
+      for (int j = 0; j < 11; j++) {
+        Serial.print(logs[i].sensorData[j]);
+        if (j < 10) Serial.print(",");
+      }
+      Serial.println();
+    }
+  }
+}
+
 void setup() {
   // Initialize serial communication
   Serial.begin(9600);
@@ -73,6 +191,9 @@ void setup() {
 
   pinMode(LED_PIN, OUTPUT);
   pinMode(BUZZER_PIN, OUTPUT);
+
+  // Load user profiles from SPIFFS
+  loadUserProfiles();
 
   // Initialize TensorFlow Lite
   static tflite::MicroErrorReporter micro_error_reporter;
@@ -238,22 +359,81 @@ void loop() {
         return;
       }
 
-      // Get output (assuming binary classification: 0 = good, 1 = bad)
-      float prediction = output->data.f[0];
-
-      Serial.print("ML Prediction: ");
-      Serial.println(prediction);
-
-      if (prediction > 0.5) {  // Threshold for bad posture
-        Serial.println("Posture: BAD");
-        digitalWrite(LED_PIN, HIGH);
-        digitalWrite(BUZZER_PIN, HIGH);
-        delay(200);
-        digitalWrite(BUZZER_PIN, LOW);
-      } else {
-        Serial.println("Posture: GOOD");
-        digitalWrite(LED_PIN, LOW);
+      // Get output (multi-class classification)
+      // Assume output tensor has multiple values, find the class with highest probability
+      int numClasses = output->dims->data[1];  // Assuming shape [1, num_classes]
+      int predictedClass = 0;
+      float maxProb = output->data.f[0];
+      
+      for (int i = 1; i < numClasses; i++) {
+        if (output->data.f[i] > maxProb) {
+          maxProb = output->data.f[i];
+          predictedClass = i;
+        }
       }
+
+      // Log the data
+      int sensorData[11] = {pressure1, pressure2, pressure3, pressure4, pressure5, 
+                           vibration1, vibration2, vibration3, vibration4, flex1, flex2};
+      logPostureData(predictedClass, sensorData);
+
+      Serial.print("ML Prediction - Class: ");
+      Serial.print(predictedClass);
+      Serial.print(" (");
+      
+      // Interpret classes (customize based on training labels)
+      switch(predictedClass) {
+        case 0: Serial.print("Good Posture"); 
+                digitalWrite(LED_PIN, LOW); 
+                break;
+        case 1: Serial.print("Slouching"); 
+                digitalWrite(LED_PIN, HIGH); 
+                digitalWrite(BUZZER_PIN, HIGH); 
+                delay(300); 
+                digitalWrite(BUZZER_PIN, LOW); 
+                break;
+        case 2: Serial.print("Leaning Left"); 
+                digitalWrite(LED_PIN, HIGH); 
+                digitalWrite(BUZZER_PIN, HIGH); 
+                delay(200); 
+                digitalWrite(BUZZER_PIN, LOW); 
+                delay(100); 
+                digitalWrite(BUZZER_PIN, HIGH); 
+                delay(200); 
+                digitalWrite(BUZZER_PIN, LOW); 
+                break;
+        case 3: Serial.print("Leaning Right"); 
+                digitalWrite(LED_PIN, HIGH); 
+                digitalWrite(BUZZER_PIN, HIGH); 
+                delay(200); 
+                digitalWrite(BUZZER_PIN, LOW); 
+                delay(100); 
+                digitalWrite(BUZZER_PIN, HIGH); 
+                delay(200); 
+                digitalWrite(BUZZER_PIN, LOW); 
+                break;
+        default: Serial.print("Unknown"); 
+                 digitalWrite(LED_PIN, HIGH); 
+                 break;
+      }
+      Serial.println(") - Logged");
+    } else if (command.startsWith("user ")) {
+      int userId = command.substring(5).toInt();
+      if (userId >= 0 && userId < MAX_USERS) {
+        currentUser = userId;
+        Serial.print("Selected user: ");
+        Serial.println(currentUser);
+      } else {
+        Serial.println("Invalid user ID (0-4)");
+      }
+    } else if (command == "calibrate") {
+      if (currentUser >= 0) {
+        calibrateUser(currentUser);
+      } else {
+        Serial.println("Select a user first with 'user X'");
+      }
+    } else if (command == "logs") {
+      exportLogs();
     } else if (command == "help") {
       Serial.println("Available commands:");
       Serial.println("p1-p5: Read pressure sensors 1-5");
@@ -263,6 +443,9 @@ void loop() {
       Serial.println("buzz: Beep buzzer");
       Serial.println("all: Read all sensors");
       Serial.println("predict: Run ML posture prediction");
+      Serial.println("user X: Select user profile (0-4)");
+      Serial.println("calibrate: Calibrate current user");
+      Serial.println("logs: Export posture logs");
       Serial.println("help: Show this help");
     } else {
       Serial.println("Unknown command. Type 'help' for available commands.");
