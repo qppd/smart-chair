@@ -141,3 +141,17 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 - Email: [your-email@example.com] (replace with actual contact)
 
 For questions, issues, or suggestions, please open an issue on GitHub or contact the maintainer directly.
+
+## Author
+
+Created with dedication by qppd
+
+## GitHub Repository
+
+Transforming everyday appliances into intelligent IoT solutions
+
+Star this project if you find it useful!
+
+![GitHub stars](https://img.shields.io/github/stars/qppd/smart-chair?style=social) ![GitHub forks](https://img.shields.io/github/forks/qppd/smart-chair?style=social) ![GitHub issues](https://img.shields.io/github/issues/qppd/smart-chair)
+
+[Back to Top](#smart-chair)
