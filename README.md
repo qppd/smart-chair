@@ -1,91 +1,246 @@
-# Smart Chair
+# Smart Chair Posture Monitoring System
 
-[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+An embedded system for real-time sitting posture detection and correction using ESP32, pressure sensors, and flex sensors to promote healthy sitting habits.
 
-An intelligent seating solution powered by Arduino, designed to enhance user comfort and interaction through automated adjustments and sensor-based feedback.
+## Problem Statement
 
-## Table of Contents
+Prolonged sitting with poor posture leads to chronic back pain, spinal misalignment, and musculoskeletal disorders. Most people are unaware of their sitting posture throughout the day. This project provides a real-time posture monitoring system that detects improper sitting positions and alerts the user immediately, helping prevent long-term health issues.
 
-- [Description](#description)
-- [Features](#features)
-- [Hardware Requirements](#hardware-requirements)
-- [Software Requirements](#software-requirements)
-- [Installation](#installation)
-- [Usage](#usage)
-- [Project Structure](#project-structure)
-- [Circuit Diagram](#circuit-diagram)
-- [Contributing](#contributing)
-- [License](#license)
-- [Contact](#contact)
+## System Overview
 
-## Description
+The Smart Chair is a sensor-based monitoring device built on the ESP32 microcontroller platform. It continuously reads data from multiple sensors embedded in the chair seat and backrest to evaluate the user's sitting posture. When improper posture is detected, the system activates visual and audio alerts to prompt the user to correct their position.
 
-The Smart Chair project leverages Arduino microcontroller technology to transform traditional seating into an interactive, adaptive experience. By integrating various sensors and actuators, the system can detect user presence, monitor environmental conditions, and automatically adjust chair settings for optimal comfort and ergonomics.
+The system operates autonomously without requiring external connectivity, processing all sensor data locally on the ESP32 for immediate feedback.
 
-This project serves as a foundation for IoT-enabled furniture, demonstrating the potential of embedded systems in everyday objects. The current implementation provides a basic framework that can be extended with additional features such as climate control, posture monitoring, and integration with smart home ecosystems.
+## Hardware Components
 
-## Features
-
-- **Occupancy Detection**: Automatically detects when a user sits on the chair
-- **Pressure Sensing**: Utilizes 5 thin film pressure sensors to monitor weight distribution and posture
-- **Vibration Detection**: 4 vibration sensors near pressure sensors for motion and activity monitoring
-- **Posture Monitoring**: 2 flex sensors on back support to track spinal curvature and posture
-- **Sensor Integration**: Supports multiple sensor types for environmental monitoring
-- **Automated Adjustments**: Programmable responses to user presence and conditions
-- **Extensible Design**: Modular architecture for easy addition of new features
-- **Low-Power Operation**: Optimized for energy-efficient microcontroller usage
-
-## Hardware Requirements
-
-### Core Components
-- ESP32 38-pin development board
-- Power supply (5V DC recommended, or USB)
-- Jumper wires and breadboard for prototyping
+### Microcontroller
+**ESP32 38-Pin Development Board**
+- Dual-core processor running at 240 MHz
+- 520 KB SRAM for sensor data processing
+- Multiple GPIO pins with ADC capability for analog sensor input
+- Handles all sensor reading, posture evaluation logic, and actuator control
+- Powered via USB or external 5V DC supply
 
 ### Sensors
-- **5 Thin Film Pressure Sensors** (100kg limit each) for weight and pressure distribution detection
-  - Reference: [Thin Film Pressure Sensor on Shopee](https://shopee.ph/product/126253254/2021211981?gads_t_sig=VTJGc2RHVmtYMTlxTFVSVVRrdENkU1psNndicnpENjFrR2ZiZlcxU0ZES0RsbU5keVZKcnAvQzVHVVZocmxzT2ZxU0F3TUNrRERvMy9HY2l2NlF2L3A5dzRybE9BbjhmV0VmVERkM0EzWitsRStKb2krYU80WFVpZUxhK21LYVY&gad_source=1&gad_campaignid=23303611172&gbraid=0AAAAADPpU9BJW_Fea7rnhtzZW-foMf3J_&gclid=Cj0KCQiApL7KBhC7ARIsAD2Xq3DXCacC1htv5ALgjK617ci9V6qacZEQ-gKhLiwxe2URSwPZU7T4T5waAjr1EALw_wcB)
-- **4 Vibration Sensors** positioned near the thin film pressure sensors for motion and vibration detection
-- **2 Flex Sensors** on the back support for posture and back curvature monitoring
-- PIR motion sensor for occupancy detection (optional)
-- Temperature/humidity sensor (e.g., DHT11/DHT22) for environmental monitoring (optional)
-- Ultrasonic sensors for proximity measurement (optional)
 
-### Actuators (optional, for advanced features)
-- LED indicators for status display
-- Buzzer for audio feedback
+**5 Thin Film Pressure Sensors (100kg load capacity each)**
+- Located on the chair seat surface in strategic positions
+- Measure weight distribution across the seating area
+- Analog output proportional to applied pressure
+- Connected to ESP32 ADC pins: GPIO 32, 33, 34, 35, 36
+- Purpose: Detect if user is sitting unevenly or leaning too far forward/backward
 
-## Software Requirements
+**2 Flex Sensors**
+- Mounted vertically on the chair backrest
+- Measure the degree of back curvature
+- Analog resistance changes with bending
+- Connected to ESP32 ADC pins: GPIO 37, 38
+- Purpose: Detect slouching or excessive backward lean
 
-- Arduino IDE (version 1.8.0 or later)
-- ESP32 Boards package (install via Board Manager: esp32 by Espressif Systems)
-- Fritzing (for viewing/editing wiring diagrams)
+**4 Vibration Sensors**
+- Positioned near pressure sensors on seat surface
+- Digital output (HIGH when vibration detected)
+- Connected to ESP32 GPIO pins: 16, 17, 18, 19
+- Purpose: Detect excessive movement or fidgeting indicating discomfort
 
-## Installation
+### Actuators
 
-### Hardware Setup
-1. Assemble the circuit according to the wiring diagram (see [Circuit Diagram](#circuit-diagram))
-2. Connect sensors and actuators to the appropriate ESP32 GPIO pins
-3. Power the ESP32 board via USB or external power supply
+**LED Indicator**
+- Connected to GPIO 2
+- Visual feedback for posture status
+- ON = Bad posture detected
+- OFF = Good posture
 
-### Software Setup
-1. Download and install the Arduino IDE from [arduino.cc](https://www.arduino.cc/en/software)
-2. Clone this repository:
-   ```bash
-   git clone https://github.com/qppd/smart-chair.git
-   ```
-3. Open `source/SmartChair/SmartChair.ino` in Arduino IDE
-4. Select your ESP32 board from Tools > Board (e.g., ESP32 Dev Module)
-5. Select the correct port from Tools > Port
-6. Click Upload to flash the code to your ESP32
+**Buzzer**
+- Connected to GPIO 4
+- Audio alert for bad posture
+- Beeps when improper posture is detected
 
-## Usage
+### Power Supply
+- 5V DC via USB cable or external adapter
+- Total current consumption: approximately 200-300 mA under normal operation
 
-1. Power on the ESP32 board
-2. The system will initialize and begin monitoring sensors
-3. Open Serial Monitor in Arduino IDE (Tools > Serial Monitor) to interact with the system
-4. Send commands like 'p1', 'v1', 'f1', 'led on', etc. to test components
-5. Type 'help' for a list of available commands
+## Posture Detection Algorithm
+
+The system uses a threshold-based algorithm to evaluate posture in real-time:
+
+### Data Acquisition
+1. Read analog values from all 5 pressure sensors (0-4095 range on ESP32 ADC)
+2. Read analog values from 2 flex sensors (0-4095 range)
+3. Read digital states from 4 vibration sensors (0 or 1)
+
+### Posture Evaluation Logic
+
+**Good Posture Criteria:**
+- Pressure is evenly distributed across all 5 sensors (variance below threshold)
+- Both flex sensors show minimal bending (values within acceptable range indicating upright back)
+- No excessive vibration detected
+
+**Bad Posture Indicators:**
+- Uneven pressure distribution (one or more sensors significantly higher/lower than others)
+- Flex sensors indicate slouching (high resistance change)
+- One side of the seat has more pressure than the other (lateral imbalance)
+- Continuous vibration indicating restlessness
+
+### Decision Logic
+```
+IF (pressure_variance > THRESHOLD_PRESSURE) THEN
+    posture = BAD
+ELSE IF (flex_sensor_1 > THRESHOLD_FLEX OR flex_sensor_2 > THRESHOLD_FLEX) THEN
+    posture = BAD
+ELSE IF (pressure_front_sensors >> pressure_back_sensors) THEN
+    posture = BAD (leaning too far forward)
+ELSE
+    posture = GOOD
+END IF
+```
+
+### System Response
+
+**If Posture is NOT OK:**
+- Turn LED ON
+- Activate buzzer (short beep pattern)
+- Continue monitoring
+
+**If Posture is OK:**
+- Turn LED OFF
+- Buzzer remains silent
+- Continue monitoring
+
+## System Flowchart
+
+```mermaid
+graph TD
+    A[Power ON] --> B[Initialize ESP32]
+    B --> C[Configure GPIO Pins]
+    C --> D[Set Pin Modes for Sensors and Actuators]
+    D --> E[Serial Monitor Start - 9600 baud]
+    E --> F[LED Blink - System Ready]
+    F --> G{Wait for Serial Command}
+    
+    G -->|Command Received| H[Parse Command]
+    H --> I{Command Type?}
+    
+    I -->|p1-p5| J[Read Pressure Sensor]
+    I -->|v1-v4| K[Read Vibration Sensor]
+    I -->|f1-f2| L[Read Flex Sensor]
+    I -->|led on/off| M[Control LED]
+    I -->|buzz| N[Activate Buzzer]
+    I -->|all| O[Read All Sensors]
+    I -->|help| P[Display Help Menu]
+    
+    J --> Q[Send Reading to Serial]
+    K --> Q
+    L --> Q
+    M --> Q
+    N --> Q
+    O --> R[Process All Sensor Data]
+    P --> Q
+    
+    R --> S[Calculate Pressure Variance]
+    S --> T[Evaluate Flex Sensor Values]
+    T --> U{Posture Evaluation}
+    
+    U -->|Uneven Pressure| V[BAD POSTURE]
+    U -->|Excessive Flex| V
+    U -->|Forward Lean| V
+    U -->|All OK| W[GOOD POSTURE]
+    
+    V --> X[LED ON]
+    V --> Y[Buzzer BEEP]
+    
+    W --> Z[LED OFF]
+    W --> AA[Buzzer Silent]
+    
+    X --> Q
+    Y --> Q
+    Z --> Q
+    AA --> Q
+    
+    Q --> G
+```
+
+## Firmware Logic Overview
+
+The firmware is written in Arduino C++ for the ESP32 platform. The main program structure consists of:
+
+### Setup Function
+- Initialize serial communication at 9600 baud
+- Configure all sensor pins as INPUT
+- Configure all actuator pins as OUTPUT
+- Perform initial LED blink to indicate system readiness
+
+### Loop Function
+The system operates in command-driven mode for testing and debugging:
+- Wait for serial input commands
+- Parse received command string
+- Execute corresponding action based on command
+- Return sensor readings or status to serial monitor
+
+### Available Commands
+- `p1` to `p5`: Read individual pressure sensors
+- `v1` to `v4`: Read individual vibration sensors
+- `f1` to `f2`: Read individual flex sensors
+- `led on` / `led off`: Control LED state
+- `buzz`: Test buzzer
+- `all`: Read all sensors simultaneously
+- `help`: Display command list
+
+This command-based approach allows for component-level testing and validation during development and deployment.
+
+## Pin Assignments
+
+| Component | GPIO Pin | Type | Notes |
+|-----------|----------|------|-------|
+| Pressure Sensor 1 | 32 | Analog Input | ADC1 |
+| Pressure Sensor 2 | 33 | Analog Input | ADC1 |
+| Pressure Sensor 3 | 34 | Analog Input | ADC1, Input-only |
+| Pressure Sensor 4 | 35 | Analog Input | ADC1, Input-only |
+| Pressure Sensor 5 | 36 | Analog Input | ADC1, Input-only |
+| Vibration Sensor 1 | 16 | Digital Input | Safe GPIO |
+| Vibration Sensor 2 | 17 | Digital Input | Safe GPIO |
+| Vibration Sensor 3 | 18 | Digital Input | Safe GPIO |
+| Vibration Sensor 4 | 19 | Digital Input | Safe GPIO |
+| Flex Sensor 1 | 37 | Analog Input | ADC1, Input-only |
+| Flex Sensor 2 | 38 | Analog Input | ADC1, Input-only |
+| LED Indicator | 2 | Digital Output | Built-in LED compatible |
+| Buzzer | 4 | Digital Output | PWM capable |
+
+All pin assignments avoid conflicts with ESP32 boot pins, flash pins, and WiFi operation.
+
+## Setup and Operation
+
+### Hardware Assembly
+1. Mount 5 pressure sensors on chair seat in grid pattern (corners + center)
+2. Attach 2 flex sensors vertically on chair backrest (left and right side)
+3. Place 4 vibration sensors near pressure sensors on seat
+4. Connect all sensor outputs to designated ESP32 GPIO pins
+5. Connect LED and buzzer to designated output pins
+6. Provide 5V power to ESP32 via USB or DC adapter
+
+### Software Installation
+1. Install Arduino IDE version 1.8.0 or newer
+2. Add ESP32 board support via Board Manager (install "esp32" by Espressif Systems)
+3. Clone repository: `git clone https://github.com/qppd/smart-chair.git`
+4. Open `source/SmartChair/SmartChair.ino` in Arduino IDE
+5. Select board: Tools > Board > ESP32 Dev Module
+6. Select correct COM port
+7. Upload firmware to ESP32
+
+### Operation
+1. Power on the ESP32
+2. System initializes and LED blinks once
+3. Open Serial Monitor at 9600 baud
+4. Use serial commands to test individual components
+5. Observe sensor readings and actuator responses
+6. Verify posture detection logic by simulating different sitting positions
+
+## Wiring Diagram
+
+Refer to the wiring directory for detailed circuit diagrams:
+- `wiring/Wiring.fzz` - Editable Fritzing source file
+- `wiring/Wiring.png` - Static circuit diagram image
 
 ## Project Structure
 
@@ -93,63 +248,42 @@ This project serves as a foundation for IoT-enabled furniture, demonstrating the
 smart-chair/
 ├── source/
 │   └── SmartChair/
-│       └── SmartChair.ino          # Main Arduino sketch
+│       └── SmartChair.ino          # Main ESP32 firmware
 ├── wiring/
-│   ├── Wiring.fzz                  # Fritzing circuit diagram
-│   └── Wiring.png                  # Wiring diagram image
-├── diagram/                        # Additional project diagrams
+│   ├── Wiring.fzz                  # Fritzing circuit design
+│   └── Wiring.png                  # Circuit diagram image
+├── diagram/                        # Additional system diagrams
 ├── LICENSE                         # MIT License
-└── README.md                       # This file
+└── README.md                       # This documentation
 ```
 
-## Circuit Diagram
+## Limitations
 
-The hardware connections are documented in the wiring directory:
+1. **No Calibration Mechanism**: Sensor thresholds are hardcoded and not adjustable per user body type or weight
+2. **Single User Profile**: System does not adapt to different users with varying body dimensions
+3. **Limited Posture States**: Only binary classification (good/bad) without specific posture type identification
+4. **No Data Logging**: System does not store historical posture data for trend analysis
+5. **Wired Power Only**: Requires constant USB or DC power connection, not battery operated
+6. **Manual Testing Mode**: Current firmware requires serial commands for operation, not autonomous real-time monitoring
+7. **Fixed Thresholds**: Pressure and flex thresholds must be determined experimentally and hardcoded
+8. **No Wireless Communication**: System operates standalone without WiFi or Bluetooth connectivity
+9. **Sensor Placement Sensitivity**: Performance depends on accurate sensor positioning during installation
+10. **Environmental Factors**: Pressure sensors may drift with temperature changes or long-term use
 
-- **[Wiring.fzz](wiring/Wiring.fzz)**: Editable Fritzing diagram for circuit design
-- **[Wiring.png](wiring/Wiring.png)**: Static image of the wiring schematic
+## Future Development Path
 
-Use Fritzing software to view and modify the circuit diagram. Ensure all connections match the pin assignments in the Arduino code.
-
-## Contributing
-
-We welcome contributions to the Smart Chair project! Here's how you can help:
-
-1. Fork the repository
-2. Create a feature branch (`git checkout -b feature/AmazingFeature`)
-3. Commit your changes (`git commit -m 'Add some AmazingFeature'`)
-4. Push to the branch (`git push origin feature/AmazingFeature`)
-5. Open a Pull Request
-
-### Development Guidelines
-- Follow Arduino coding best practices
-- Document any new hardware additions
-- Update wiring diagrams for circuit changes
-- Test thoroughly on target hardware
+While the current system operates on threshold-based logic, the hardware and ESP32 platform support integration of machine learning models using TensorFlow Lite for Microcontrollers. This would enable more sophisticated posture classification based on trained models rather than fixed thresholds.
 
 ## License
 
-This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
-
-## Contact
-
-**Sajed Lopez Mendoza**
-
-- Project Repository: [https://github.com/qppd/smart-chair](https://github.com/qppd/smart-chair)
-- Email: [your-email@example.com] (replace with actual contact)
-
-For questions, issues, or suggestions, please open an issue on GitHub or contact the maintainer directly.
+This project is licensed under the MIT License. See LICENSE file for details.
 
 ## Author
 
-Created with dedication by qppd
+Created by qppd
 
-## GitHub Repository
+## Repository
 
-Transforming everyday appliances into intelligent IoT solutions
-
-Star this project if you find it useful!
+https://github.com/qppd/smart-chair
 
 ![GitHub stars](https://img.shields.io/github/stars/qppd/smart-chair?style=social) ![GitHub forks](https://img.shields.io/github/forks/qppd/smart-chair?style=social) ![GitHub issues](https://img.shields.io/github/issues/qppd/smart-chair)
-
-[Back to Top](#smart-chair)
