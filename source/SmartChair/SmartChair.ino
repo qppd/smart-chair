@@ -3,12 +3,11 @@
 // Includes Random Forest model for posture prediction using TFLite Micro
 // Features: Calibration, User Profiles, Multi-class Posture Detection, Data Logging
 
-#include <TensorFlowLite.h>
-#include <tensorflow/lite/micro/all_ops_resolver.h>
-#include <tensorflow/lite/micro/micro_error_reporter.h>
-#include <tensorflow/lite/micro/micro_interpreter.h>
-#include <tensorflow/lite/schema/schema_generated.h>
-#include <tensorflow/lite/version.h>
+#include <TensorFlowLite_ESP32.h>
+#include "tensorflow/lite/micro/kernels/all_ops_resolver.h"
+#include "tensorflow/lite/micro/micro_interpreter.h"
+#include "tensorflow/lite/schema/schema_generated.h"
+#include "tensorflow/lite/version.h"
 
 #include <SPIFFS.h>  // For file storage
 #include <EEPROM.h>  // For persistent storage
@@ -64,7 +63,6 @@ int logIndex = 0;
 
 // TFLite globals
 namespace {
-  tflite::ErrorReporter* error_reporter = nullptr;
   const tflite::Model* model = nullptr;
   tflite::MicroInterpreter* interpreter = nullptr;
   TfLiteTensor* input = nullptr;
@@ -196,25 +194,28 @@ void setup() {
   loadUserProfiles();
 
   // Initialize TensorFlow Lite
-  static tflite::MicroErrorReporter micro_error_reporter;
-  error_reporter = &micro_error_reporter;
-
   model = tflite::GetModel(model_tflite);
   if (model->version() != TFLITE_SCHEMA_VERSION) {
-    TF_LITE_REPORT_ERROR(error_reporter, "Model provided is schema version %d not equal to supported version %d.",
-                         model->version(), TFLITE_SCHEMA_VERSION);
+    Serial.print("Model version mismatch: ");
+    Serial.println(model->version());
     return;
   }
 
-  static tflite::AllOpsResolver resolver;
+  static tflite::MicroMutableOpResolver<10> resolver;
+  
+  // Add operations needed for Random Forest
+  resolver.AddBuiltin(tflite::BuiltinOperator_FULLY_CONNECTED,
+                      tflite::ops::micro::Register_FULLY_CONNECTED());
+  resolver.AddBuiltin(tflite::BuiltinOperator_SOFTMAX,
+                      tflite::ops::micro::Register_SOFTMAX());
 
   static tflite::MicroInterpreter static_interpreter(
-      model, resolver, tensor_arena, kTensorArenaSize, error_reporter);
+      model, resolver, tensor_arena, kTensorArenaSize);
   interpreter = &static_interpreter;
 
   TfLiteStatus allocate_status = interpreter->AllocateTensors();
   if (allocate_status != kTfLiteOk) {
-    TF_LITE_REPORT_ERROR(error_reporter, "AllocateTensors() failed");
+    Serial.println("AllocateTensors() failed");
     return;
   }
 
@@ -354,7 +355,6 @@ void loop() {
       // Run inference
       TfLiteStatus invoke_status = interpreter->Invoke();
       if (invoke_status != kTfLiteOk) {
-        TF_LITE_REPORT_ERROR(error_reporter, "Invoke failed");
         Serial.println("Prediction failed");
         return;
       }
