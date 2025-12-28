@@ -189,6 +189,39 @@ The system operates in command-driven mode for testing and debugging:
 
 This command-based approach allows for component-level testing and validation during development and deployment.
 
+## Machine Learning Integration
+
+The system includes TensorFlow Lite for Microcontrollers to run a Random Forest model for posture classification. This provides more sophisticated posture detection compared to simple threshold-based logic.
+
+### Model Training
+1. Collect sensor data from multiple users in good and bad posture positions
+2. Label the data (0 = good posture, 1 = bad posture)
+3. Train a Random Forest classifier using scikit-learn in Python
+4. Convert the trained model to TensorFlow Lite format (.tflite)
+5. Embed the model bytes into the ESP32 firmware
+
+### Model Input Features
+- 5 pressure sensor readings (normalized 0-1)
+- 4 vibration sensor states (0 or 1)
+- 2 flex sensor readings (normalized 0-1)
+- Total: 11 input features
+
+### Model Output
+- Single float value (0.0 to 1.0)
+- Values > 0.5 indicate bad posture
+- Values ≤ 0.5 indicate good posture
+
+### Firmware Commands
+- `predict`: Runs ML inference on current sensor readings and controls actuators based on result
+
+### Model Replacement
+To update the model:
+1. Train a new Random Forest model
+2. Convert to .tflite using TensorFlow tools
+3. Replace the `model_tflite` array in the code with new model bytes
+4. Update `model_tflite_len` with the new length
+5. Recompile and upload to ESP32
+
 ## Pin Assignments
 
 | Component | GPIO Pin | Type | Notes |

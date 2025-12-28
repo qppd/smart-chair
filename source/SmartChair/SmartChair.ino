@@ -1,5 +1,13 @@
-// Smart Chair ESP32 Sketch
+// Smart Chair ESP32 Sketch with TensorFlow Lite Micro
 // This sketch controls the smart chair with pressure, vibration, and flex sensors
+// Includes Random Forest model for posture prediction using TFLite Micro
+
+#include <TensorFlowLite.h>
+#include <tensorflow/lite/micro/all_ops_resolver.h>
+#include <tensorflow/lite/micro/micro_error_reporter.h>
+#include <tensorflow/lite/micro/micro_interpreter.h>
+#include <tensorflow/lite/schema/schema_generated.h>
+#include <tensorflow/lite/version.h>
 
 // Pin definitions for ESP32 38-pin board (GPIO numbers)
 // Avoiding pins that conflict with WiFi, boot, or flash
@@ -19,6 +27,29 @@
 
 #define LED_PIN 2   // Safe for output
 #define BUZZER_PIN 4  // Safe for output
+
+// TFLite globals
+namespace {
+  tflite::ErrorReporter* error_reporter = nullptr;
+  const tflite::Model* model = nullptr;
+  tflite::MicroInterpreter* interpreter = nullptr;
+  TfLiteTensor* input = nullptr;
+  TfLiteTensor* output = nullptr;
+
+  // Arena size for TFLite (adjust based on model size)
+  constexpr int kTensorArenaSize = 8 * 1024;
+  uint8_t tensor_arena[kTensorArenaSize];
+}
+
+// Placeholder for Random Forest model (replace with actual trained model)
+// This should be the .tflite file content as a byte array
+// Generated from: python -c "import numpy as np; model_bytes = open('model.tflite', 'rb').read(); print(', '.join([str(b) for b in model_bytes]))"
+const unsigned char model_tflite[] = {
+  // PLACEHOLDER: Replace with actual model bytes
+  // Example: 0x1C, 0x00, 0x00, 0x00, ... (full model data)
+  0x00  // Minimal placeholder - replace with real model
+};
+const int model_tflite_len = 1;  // Replace with actual length
 
 void setup() {
   // Initialize serial communication
@@ -42,6 +73,34 @@ void setup() {
 
   pinMode(LED_PIN, OUTPUT);
   pinMode(BUZZER_PIN, OUTPUT);
+
+  // Initialize TensorFlow Lite
+  static tflite::MicroErrorReporter micro_error_reporter;
+  error_reporter = &micro_error_reporter;
+
+  model = tflite::GetModel(model_tflite);
+  if (model->version() != TFLITE_SCHEMA_VERSION) {
+    TF_LITE_REPORT_ERROR(error_reporter, "Model provided is schema version %d not equal to supported version %d.",
+                         model->version(), TFLITE_SCHEMA_VERSION);
+    return;
+  }
+
+  static tflite::AllOpsResolver resolver;
+
+  static tflite::MicroInterpreter static_interpreter(
+      model, resolver, tensor_arena, kTensorArenaSize, error_reporter);
+  interpreter = &static_interpreter;
+
+  TfLiteStatus allocate_status = interpreter->AllocateTensors();
+  if (allocate_status != kTfLiteOk) {
+    TF_LITE_REPORT_ERROR(error_reporter, "AllocateTensors() failed");
+    return;
+  }
+
+  input = interpreter->input(0);
+  output = interpreter->output(0);
+
+  Serial.println("TFLite Model Loaded Successfully");
 
   // Initial LED blink to indicate setup complete
   digitalWrite(LED_PIN, HIGH);
@@ -142,6 +201,59 @@ void loop() {
       Serial.print("Flex: ");
       Serial.print(flex1); Serial.print(", ");
       Serial.println(flex2);
+    } else if (command == "predict") {
+      // Read all sensors for ML prediction
+      int pressure1 = analogRead(PRESSURE_SENSOR_1);
+      int pressure2 = analogRead(PRESSURE_SENSOR_2);
+      int pressure3 = analogRead(PRESSURE_SENSOR_3);
+      int pressure4 = analogRead(PRESSURE_SENSOR_4);
+      int pressure5 = analogRead(PRESSURE_SENSOR_5);
+
+      int vibration1 = digitalRead(VIBRATION_SENSOR_1);
+      int vibration2 = digitalRead(VIBRATION_SENSOR_2);
+      int vibration3 = digitalRead(VIBRATION_SENSOR_3);
+      int vibration4 = digitalRead(VIBRATION_SENSOR_4);
+
+      int flex1 = analogRead(FLEX_SENSOR_1);
+      int flex2 = analogRead(FLEX_SENSOR_2);
+
+      // Prepare input tensor (11 features: 5 pressure + 4 vibration + 2 flex)
+      input->data.f[0] = pressure1 / 4095.0f;  // Normalize to 0-1
+      input->data.f[1] = pressure2 / 4095.0f;
+      input->data.f[2] = pressure3 / 4095.0f;
+      input->data.f[3] = pressure4 / 4095.0f;
+      input->data.f[4] = pressure5 / 4095.0f;
+      input->data.f[5] = vibration1;
+      input->data.f[6] = vibration2;
+      input->data.f[7] = vibration3;
+      input->data.f[8] = vibration4;
+      input->data.f[9] = flex1 / 4095.0f;
+      input->data.f[10] = flex2 / 4095.0f;
+
+      // Run inference
+      TfLiteStatus invoke_status = interpreter->Invoke();
+      if (invoke_status != kTfLiteOk) {
+        TF_LITE_REPORT_ERROR(error_reporter, "Invoke failed");
+        Serial.println("Prediction failed");
+        return;
+      }
+
+      // Get output (assuming binary classification: 0 = good, 1 = bad)
+      float prediction = output->data.f[0];
+
+      Serial.print("ML Prediction: ");
+      Serial.println(prediction);
+
+      if (prediction > 0.5) {  // Threshold for bad posture
+        Serial.println("Posture: BAD");
+        digitalWrite(LED_PIN, HIGH);
+        digitalWrite(BUZZER_PIN, HIGH);
+        delay(200);
+        digitalWrite(BUZZER_PIN, LOW);
+      } else {
+        Serial.println("Posture: GOOD");
+        digitalWrite(LED_PIN, LOW);
+      }
     } else if (command == "help") {
       Serial.println("Available commands:");
       Serial.println("p1-p5: Read pressure sensors 1-5");
@@ -150,6 +262,7 @@ void loop() {
       Serial.println("led on/off: Control LED");
       Serial.println("buzz: Beep buzzer");
       Serial.println("all: Read all sensors");
+      Serial.println("predict: Run ML posture prediction");
       Serial.println("help: Show this help");
     } else {
       Serial.println("Unknown command. Type 'help' for available commands.");
