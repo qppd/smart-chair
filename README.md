@@ -28,6 +28,8 @@ This project serves as a foundation for IoT-enabled furniture, demonstrating the
 
 - **Occupancy Detection**: Automatically detects when a user sits on the chair
 - **Pressure Sensing**: Utilizes 5 thin film pressure sensors to monitor weight distribution and posture
+- **Vibration Detection**: 4 vibration sensors near pressure sensors for motion and activity monitoring
+- **Posture Monitoring**: 2 flex sensors on back support to track spinal curvature and posture
 - **Sensor Integration**: Supports multiple sensor types for environmental monitoring
 - **Automated Adjustments**: Programmable responses to user presence and conditions
 - **Extensible Design**: Modular architecture for easy addition of new features
@@ -43,6 +45,8 @@ This project serves as a foundation for IoT-enabled furniture, demonstrating the
 ### Sensors
 - **5 Thin Film Pressure Sensors** (100kg limit each) for weight and pressure distribution detection
   - Reference: [Thin Film Pressure Sensor on Shopee](https://shopee.ph/product/126253254/2021211981?gads_t_sig=VTJGc2RHVmtYMTlxTFVSVVRrdENkU1psNndicnpENjFrR2ZiZlcxU0ZES0RsbU5keVZKcnAvQzVHVVZocmxzT2ZxU0F3TUNrRERvMy9HY2l2NlF2L3A5dzRybE9BbjhmV0VmVERkM0EzWitsRStKb2krYU80WFVpZUxhK21LYVY&gad_source=1&gad_campaignid=23303611172&gbraid=0AAAAADPpU9BJW_Fea7rnhtzZW-foMf3J_&gclid=Cj0KCQiApL7KBhC7ARIsAD2Xq3DXCacC1htv5ALgjK617ci9V6qacZEQ-gKhLiwxe2URSwPZU7T4T5waAjr1EALw_wcB)
+- **4 Vibration Sensors** positioned near the thin film pressure sensors for motion and vibration detection
+- **2 Flex Sensors** on the back support for posture and back curvature monitoring
 - PIR motion sensor for occupancy detection (optional)
 - Temperature/humidity sensor (e.g., DHT11/DHT22) for environmental monitoring (optional)
 - Ultrasonic sensors for proximity measurement (optional)
