@@ -2,22 +2,23 @@
 // This sketch controls the smart chair with pressure, vibration, and flex sensors
 
 // Pin definitions for ESP32 38-pin board (GPIO numbers)
-#define PRESSURE_SENSOR_1 32  // ADC1
-#define PRESSURE_SENSOR_2 33  // ADC1
-#define PRESSURE_SENSOR_3 34  // ADC1
-#define PRESSURE_SENSOR_4 35  // ADC1
-#define PRESSURE_SENSOR_5 36  // ADC1
+// Avoiding pins that conflict with WiFi, boot, or flash
+#define PRESSURE_SENSOR_1 32  // ADC1, bidirectional
+#define PRESSURE_SENSOR_2 33  // ADC1, bidirectional
+#define PRESSURE_SENSOR_3 34  // ADC1, input only (ok for analog read)
+#define PRESSURE_SENSOR_4 35  // ADC1, input only (ok for analog read)
+#define PRESSURE_SENSOR_5 36  // ADC1, input only (ok for analog read)
 
-#define VIBRATION_SENSOR_1 12  // Digital
-#define VIBRATION_SENSOR_2 13  // Digital
-#define VIBRATION_SENSOR_3 14  // Digital
-#define VIBRATION_SENSOR_4 15  // Digital
+#define VIBRATION_SENSOR_1 16  // Digital, safe
+#define VIBRATION_SENSOR_2 17  // Digital, safe
+#define VIBRATION_SENSOR_3 18  // Digital, safe
+#define VIBRATION_SENSOR_4 19  // Digital, safe
 
-#define FLEX_SENSOR_1 37  // ADC1
-#define FLEX_SENSOR_2 38  // ADC1
+#define FLEX_SENSOR_1 37  // ADC1, input only (ok for analog read)
+#define FLEX_SENSOR_2 38  // ADC1, input only (ok for analog read)
 
-#define LED_PIN 2
-#define BUZZER_PIN 4
+#define LED_PIN 2   // Safe for output
+#define BUZZER_PIN 4  // Safe for output
 
 void setup() {
   // Initialize serial communication
