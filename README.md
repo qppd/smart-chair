@@ -52,7 +52,6 @@ This project serves as a foundation for IoT-enabled furniture, demonstrating the
 - Ultrasonic sensors for proximity measurement (optional)
 
 ### Actuators (optional, for advanced features)
-- Servo motors for adjustable components
 - LED indicators for status display
 - Buzzer for audio feedback
 
