@@ -4,10 +4,6 @@
 // Features: Calibration, User Profiles, Multi-class Posture Detection, Data Logging
 
 #include <TensorFlowLite_ESP32.h>
-#include "tensorflow/lite/micro/kernels/all_ops_resolver.h"
-#include "tensorflow/lite/micro/micro_interpreter.h"
-#include "tensorflow/lite/schema/schema_generated.h"
-#include "tensorflow/lite/version.h"
 
 #include <SPIFFS.h>  // For file storage
 #include <EEPROM.h>  // For persistent storage
@@ -201,13 +197,9 @@ void setup() {
     return;
   }
 
-  static tflite::MicroMutableOpResolver<10> resolver;
-  
-  // Add operations needed for Random Forest
-  resolver.AddBuiltin(tflite::BuiltinOperator_FULLY_CONNECTED,
-                      tflite::ops::micro::Register_FULLY_CONNECTED());
-  resolver.AddBuiltin(tflite::BuiltinOperator_SOFTMAX,
-                      tflite::ops::micro::Register_SOFTMAX());
+  static tflite::MicroMutableOpResolver<5> resolver;
+  resolver.AddFullyConnected();
+  resolver.AddSoftmax();
 
   static tflite::MicroInterpreter static_interpreter(
       model, resolver, tensor_arena, kTensorArenaSize);
@@ -218,6 +210,11 @@ void setup() {
     Serial.println("AllocateTensors() failed");
     return;
   }
+
+  input = interpreter->input(0);
+  output = interpreter->output(0);
+
+  Serial.println("TFLite Model Loaded Successfully");
 
   input = interpreter->input(0);
   output = interpreter->output(0);
