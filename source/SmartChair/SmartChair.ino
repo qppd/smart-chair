@@ -1,23 +1,23 @@
-// Smart Chair Arduino Sketch
+// Smart Chair ESP32 Sketch
 // This sketch controls the smart chair with pressure, vibration, and flex sensors
 
-// Pin definitions (adjust based on wiring)
-#define PRESSURE_SENSOR_1 A0
-#define PRESSURE_SENSOR_2 A1
-#define PRESSURE_SENSOR_3 A2
-#define PRESSURE_SENSOR_4 A3
-#define PRESSURE_SENSOR_5 A4
+// Pin definitions for ESP32 38-pin board (GPIO numbers)
+#define PRESSURE_SENSOR_1 32  // ADC1
+#define PRESSURE_SENSOR_2 33  // ADC1
+#define PRESSURE_SENSOR_3 34  // ADC1
+#define PRESSURE_SENSOR_4 35  // ADC1
+#define PRESSURE_SENSOR_5 36  // ADC1
 
-#define VIBRATION_SENSOR_1 2
-#define VIBRATION_SENSOR_2 3
-#define VIBRATION_SENSOR_3 4
-#define VIBRATION_SENSOR_4 5
+#define VIBRATION_SENSOR_1 12  // Digital
+#define VIBRATION_SENSOR_2 13  // Digital
+#define VIBRATION_SENSOR_3 14  // Digital
+#define VIBRATION_SENSOR_4 15  // Digital
 
-#define FLEX_SENSOR_1 A5
-#define FLEX_SENSOR_2 A6
+#define FLEX_SENSOR_1 37  // ADC1
+#define FLEX_SENSOR_2 38  // ADC1
 
-#define LED_PIN 13
-#define BUZZER_PIN 6
+#define LED_PIN 2
+#define BUZZER_PIN 4
 
 void setup() {
   // Initialize serial communication

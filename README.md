@@ -38,8 +38,8 @@ This project serves as a foundation for IoT-enabled furniture, demonstrating the
 ## Hardware Requirements
 
 ### Core Components
-- Arduino Uno (or compatible board with ATmega328P)
-- Power supply (5V DC recommended)
+- ESP32 38-pin development board
+- Power supply (5V DC recommended, or USB)
 - Jumper wires and breadboard for prototyping
 
 ### Sensors
@@ -58,15 +58,15 @@ This project serves as a foundation for IoT-enabled furniture, demonstrating the
 ## Software Requirements
 
 - Arduino IDE (version 1.8.0 or later)
-- Arduino AVR Boards package (included with IDE)
+- ESP32 Boards package (install via Board Manager: esp32 by Espressif Systems)
 - Fritzing (for viewing/editing wiring diagrams)
 
 ## Installation
 
 ### Hardware Setup
 1. Assemble the circuit according to the wiring diagram (see [Circuit Diagram](#circuit-diagram))
-2. Connect sensors and actuators to the appropriate Arduino pins
-3. Power the Arduino board via USB or external power supply
+2. Connect sensors and actuators to the appropriate ESP32 GPIO pins
+3. Power the ESP32 board via USB or external power supply
 
 ### Software Setup
 1. Download and install the Arduino IDE from [arduino.cc](https://www.arduino.cc/en/software)
@@ -75,19 +75,17 @@ This project serves as a foundation for IoT-enabled furniture, demonstrating the
    git clone https://github.com/qppd/smart-chair.git
    ```
 3. Open `source/SmartChair/SmartChair.ino` in Arduino IDE
-4. Select your Arduino board from Tools > Board
+4. Select your ESP32 board from Tools > Board (e.g., ESP32 Dev Module)
 5. Select the correct port from Tools > Port
-6. Click Upload to flash the code to your Arduino
+6. Click Upload to flash the code to your ESP32
 
 ## Usage
 
-1. Power on the Arduino board
+1. Power on the ESP32 board
 2. The system will initialize and begin monitoring sensors
-3. Sit on the chair to trigger occupancy detection
-4. Observe LED indicators or serial output for system status
-5. Customize behavior by modifying the Arduino sketch
-
-For debugging, open the Serial Monitor in Arduino IDE (Tools > Serial Monitor) to view sensor readings and system messages.
+3. Open Serial Monitor in Arduino IDE (Tools > Serial Monitor) to interact with the system
+4. Send commands like 'p1', 'v1', 'f1', 'led on', etc. to test components
+5. Type 'help' for a list of available commands
 
 ## Project Structure
 
