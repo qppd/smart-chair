@@ -364,10 +364,51 @@ void loop() {
       }
     } else if (command == "logs") {
       exportLogs();
+    } else if (command == "vib1 on") {
+      digitalWrite(VIBRATION_MOTOR_1, HIGH);
+      Serial.println("Vibration Motor 1: ON");
+    } else if (command == "vib1 off") {
+      digitalWrite(VIBRATION_MOTOR_1, LOW);
+      Serial.println("Vibration Motor 1: OFF");
+    } else if (command == "vib2 on") {
+      digitalWrite(VIBRATION_MOTOR_2, HIGH);
+      Serial.println("Vibration Motor 2: ON");
+    } else if (command == "vib2 off") {
+      digitalWrite(VIBRATION_MOTOR_2, LOW);
+      Serial.println("Vibration Motor 2: OFF");
+    } else if (command == "vib3 on") {
+      digitalWrite(VIBRATION_MOTOR_3, HIGH);
+      Serial.println("Vibration Motor 3: ON");
+    } else if (command == "vib3 off") {
+      digitalWrite(VIBRATION_MOTOR_3, LOW);
+      Serial.println("Vibration Motor 3: OFF");
+    } else if (command == "vib4 on") {
+      digitalWrite(VIBRATION_MOTOR_4, HIGH);
+      Serial.println("Vibration Motor 4: ON");
+    } else if (command == "vib4 off") {
+      digitalWrite(VIBRATION_MOTOR_4, LOW);
+      Serial.println("Vibration Motor 4: OFF");
+    } else if (command == "vib all on") {
+      digitalWrite(VIBRATION_MOTOR_1, HIGH);
+      digitalWrite(VIBRATION_MOTOR_2, HIGH);
+      digitalWrite(VIBRATION_MOTOR_3, HIGH);
+      digitalWrite(VIBRATION_MOTOR_4, HIGH);
+      Serial.println("All Vibration Motors: ON");
+    } else if (command == "vib all off") {
+      digitalWrite(VIBRATION_MOTOR_1, LOW);
+      digitalWrite(VIBRATION_MOTOR_2, LOW);
+      digitalWrite(VIBRATION_MOTOR_3, LOW);
+      digitalWrite(VIBRATION_MOTOR_4, LOW);
+      Serial.println("All Vibration Motors: OFF");
     } else if (command == "help") {
       Serial.println("Available commands:");
       Serial.println("p1-p5: Read pressure sensors 1-5");
       Serial.println("f1-f2: Read flex sensors 1-2");
+      Serial.println("vib1 on/off: Control vibration motor 1");
+      Serial.println("vib2 on/off: Control vibration motor 2");
+      Serial.println("vib3 on/off: Control vibration motor 3");
+      Serial.println("vib4 on/off: Control vibration motor 4");
+      Serial.println("vib all on/off: Control all vibration motors");
       Serial.println("led on/off: Control LED");
       Serial.println("buzz: Beep buzzer");
       Serial.println("all: Read all sensors");

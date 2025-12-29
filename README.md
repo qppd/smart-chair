@@ -100,6 +100,11 @@ graph TD
     
     I -->|p1-p5| J[Read Pressure Sensor]
     I -->|f1-f2| L[Read Flex Sensor]
+    I -->|vib1 on/off| V1[Control Vibration Motor 1]
+    I -->|vib2 on/off| V2[Control Vibration Motor 2]
+    I -->|vib3 on/off| V3[Control Vibration Motor 3]
+    I -->|vib4 on/off| V4[Control Vibration Motor 4]
+    I -->|vib all on/off| VA[Control All Vibration Motors]
     I -->|led on/off| M[Control LED]
     I -->|buzz| N[Activate Buzzer]
     I -->|all| O[Read All Sensors]
@@ -108,6 +113,11 @@ graph TD
     
     J --> Q[Send Reading to Serial]
     L --> Q
+    V1 --> Q
+    V2 --> Q
+    V3 --> Q
+    V4 --> Q
+    VA --> Q
     M --> Q
     N --> Q
     O --> R[Process All Sensor Data]
@@ -143,6 +153,11 @@ The system operates in command-driven mode for testing and debugging:
 ### Available Commands
 - `p1` to `p5`: Read individual pressure sensors
 - `f1` to `f2`: Read individual flex sensors
+- `vib1 on` / `vib1 off`: Control vibration motor 1
+- `vib2 on` / `vib2 off`: Control vibration motor 2
+- `vib3 on` / `vib3 off`: Control vibration motor 3
+- `vib4 on` / `vib4 off`: Control vibration motor 4
+- `vib all on` / `vib all off`: Control all vibration motors
 - `led on` / `led off`: Control LED state
 - `buzz`: Test buzzer
 - `all`: Read all sensors simultaneously
