@@ -1,5 +1,5 @@
 // Smart Chair ESP32 Sketch with TensorFlow Lite Micro
-// This sketch controls the smart chair with pressure, vibration, and flex sensors
+// This sketch controls the smart chair with pressure, vibration motors, and flex sensors
 // Includes Random Forest model for posture prediction using TFLite Micro
 // Features: Calibration, User Profiles, Multi-class Posture Detection, Data Logging
 
@@ -16,10 +16,10 @@
 #define PRESSURE_SENSOR_4 35  // ADC1, input only (ok for analog read)
 #define PRESSURE_SENSOR_5 36  // ADC1, input only (ok for analog read)
 
-#define VIBRATION_SENSOR_1 16  // Digital, safe
-#define VIBRATION_SENSOR_2 17  // Digital, safe
-#define VIBRATION_SENSOR_3 18  // Digital, safe
-#define VIBRATION_SENSOR_4 19  // Digital, safe
+#define VIBRATION_MOTOR_1 16  // Digital, safe
+#define VIBRATION_MOTOR_2 17  // Digital, safe
+#define VIBRATION_MOTOR_3 18  // Digital, safe
+#define VIBRATION_MOTOR_4 19  // Digital, safe
 
 #define FLEX_SENSOR_1 37  // ADC1, input only (ok for analog read)
 #define FLEX_SENSOR_2 38  // ADC1, input only (ok for analog read)
@@ -43,7 +43,7 @@ struct UserProfile {
 struct PostureLog {
   unsigned long timestamp;
   int postureClass;  // 0=good, 1=slouch, 2=lean_left, 3=lean_right, etc.
-  int sensorData[11];  // Raw sensor readings
+  int sensorData[7];  // Raw sensor readings: 5 pressure + 2 flex
 };
 
 // Constants
@@ -143,7 +143,7 @@ void calibrateUser(int userIndex) {
 void logPostureData(int postureClass, int* sensorData) {
   logs[logIndex].timestamp = millis();
   logs[logIndex].postureClass = postureClass;
-  memcpy(logs[logIndex].sensorData, sensorData, sizeof(int) * 11);
+  memcpy(logs[logIndex].sensorData, sensorData, sizeof(int) * 7);
   logIndex = (logIndex + 1) % MAX_LOGS;
 }
 
@@ -154,9 +154,9 @@ void exportLogs() {
       Serial.print("Time: "); Serial.print(logs[i].timestamp);
       Serial.print(", Class: "); Serial.print(logs[i].postureClass);
       Serial.print(", Data: ");
-      for (int j = 0; j < 11; j++) {
+      for (int j = 0; j < 7; j++) {
         Serial.print(logs[i].sensorData[j]);
-        if (j < 10) Serial.print(",");
+        if (j < 6) Serial.print(",");
       }
       Serial.println();
     }
@@ -175,10 +175,10 @@ void setup() {
   pinMode(PRESSURE_SENSOR_4, INPUT);
   pinMode(PRESSURE_SENSOR_5, INPUT);
 
-  pinMode(VIBRATION_SENSOR_1, INPUT);
-  pinMode(VIBRATION_SENSOR_2, INPUT);
-  pinMode(VIBRATION_SENSOR_3, INPUT);
-  pinMode(VIBRATION_SENSOR_4, INPUT);
+  pinMode(VIBRATION_MOTOR_1, OUTPUT);
+  pinMode(VIBRATION_MOTOR_2, OUTPUT);
+  pinMode(VIBRATION_MOTOR_3, OUTPUT);
+  pinMode(VIBRATION_MOTOR_4, OUTPUT);
 
   pinMode(FLEX_SENSOR_1, INPUT);
   pinMode(FLEX_SENSOR_2, INPUT);
@@ -252,23 +252,11 @@ void loop() {
       int pressure5 = analogRead(PRESSURE_SENSOR_5);
       Serial.print("Pressure Sensor 5: ");
       Serial.println(pressure5);
-    } else if (command == "v1") {
-      int vibration1 = digitalRead(VIBRATION_SENSOR_1);
-      Serial.print("Vibration Sensor 1: ");
-      Serial.println(vibration1);
-    } else if (command == "v2") {
-      int vibration2 = digitalRead(VIBRATION_SENSOR_2);
-      Serial.print("Vibration Sensor 2: ");
-      Serial.println(vibration2);
-    } else if (command == "v3") {
-      int vibration3 = digitalRead(VIBRATION_SENSOR_3);
-      Serial.print("Vibration Sensor 3: ");
-      Serial.println(vibration3);
-    } else if (command == "v4") {
-      int vibration4 = digitalRead(VIBRATION_SENSOR_4);
-      Serial.print("Vibration Sensor 4: ");
-      Serial.println(vibration4);
-    } else if (command == "f1") {
+    } else if (command == "f2") {
+      int flex2 = analogRead(FLEX_SENSOR_2);
+      Serial.print("Flex Sensor 2: ");
+      Serial.println(flex2);
+    } else if (command == "led on") {
       int flex1 = analogRead(FLEX_SENSOR_1);
       Serial.print("Flex Sensor 1: ");
       Serial.println(flex1);
@@ -295,11 +283,6 @@ void loop() {
       int pressure4 = analogRead(PRESSURE_SENSOR_4);
       int pressure5 = analogRead(PRESSURE_SENSOR_5);
 
-      int vibration1 = digitalRead(VIBRATION_SENSOR_1);
-      int vibration2 = digitalRead(VIBRATION_SENSOR_2);
-      int vibration3 = digitalRead(VIBRATION_SENSOR_3);
-      int vibration4 = digitalRead(VIBRATION_SENSOR_4);
-
       int flex1 = analogRead(FLEX_SENSOR_1);
       int flex2 = analogRead(FLEX_SENSOR_2);
 
@@ -310,12 +293,6 @@ void loop() {
       Serial.print(pressure3); Serial.print(", ");
       Serial.print(pressure4); Serial.print(", ");
       Serial.println(pressure5);
-
-      Serial.print("Vibration: ");
-      Serial.print(vibration1); Serial.print(", ");
-      Serial.print(vibration2); Serial.print(", ");
-      Serial.print(vibration3); Serial.print(", ");
-      Serial.println(vibration4);
 
       Serial.print("Flex: ");
       Serial.print(flex1); Serial.print(", ");
@@ -328,26 +305,17 @@ void loop() {
       int pressure4 = analogRead(PRESSURE_SENSOR_4);
       int pressure5 = analogRead(PRESSURE_SENSOR_5);
 
-      int vibration1 = digitalRead(VIBRATION_SENSOR_1);
-      int vibration2 = digitalRead(VIBRATION_SENSOR_2);
-      int vibration3 = digitalRead(VIBRATION_SENSOR_3);
-      int vibration4 = digitalRead(VIBRATION_SENSOR_4);
-
       int flex1 = analogRead(FLEX_SENSOR_1);
       int flex2 = analogRead(FLEX_SENSOR_2);
 
-      // Prepare input tensor (11 features: 5 pressure + 4 vibration + 2 flex)
+      // Prepare input tensor (7 features: 5 pressure + 2 flex)
       input->data.f[0] = pressure1 / 4095.0f;  // Normalize to 0-1
       input->data.f[1] = pressure2 / 4095.0f;
       input->data.f[2] = pressure3 / 4095.0f;
       input->data.f[3] = pressure4 / 4095.0f;
       input->data.f[4] = pressure5 / 4095.0f;
-      input->data.f[5] = vibration1;
-      input->data.f[6] = vibration2;
-      input->data.f[7] = vibration3;
-      input->data.f[8] = vibration4;
-      input->data.f[9] = flex1 / 4095.0f;
-      input->data.f[10] = flex2 / 4095.0f;
+      input->data.f[5] = flex1 / 4095.0f;
+      input->data.f[6] = flex2 / 4095.0f;
 
       // Run inference
       TfLiteStatus invoke_status = interpreter->Invoke();
@@ -370,49 +338,14 @@ void loop() {
       }
 
       // Log the data
-      int sensorData[11] = {pressure1, pressure2, pressure3, pressure4, pressure5, 
-                           vibration1, vibration2, vibration3, vibration4, flex1, flex2};
+      int sensorData[7] = {pressure1, pressure2, pressure3, pressure4, pressure5, 
+                           flex1, flex2};
       logPostureData(predictedClass, sensorData);
 
       Serial.print("ML Prediction - Class: ");
       Serial.print(predictedClass);
-      Serial.print(" (");
-      
-      // Interpret classes (customize based on training labels)
-      switch(predictedClass) {
-        case 0: Serial.print("Good Posture"); 
-                digitalWrite(LED_PIN, LOW); 
-                break;
-        case 1: Serial.print("Slouching"); 
-                digitalWrite(LED_PIN, HIGH); 
-                digitalWrite(BUZZER_PIN, HIGH); 
-                delay(300); 
-                digitalWrite(BUZZER_PIN, LOW); 
-                break;
-        case 2: Serial.print("Leaning Left"); 
-                digitalWrite(LED_PIN, HIGH); 
-                digitalWrite(BUZZER_PIN, HIGH); 
-                delay(200); 
-                digitalWrite(BUZZER_PIN, LOW); 
-                delay(100); 
-                digitalWrite(BUZZER_PIN, HIGH); 
-                delay(200); 
-                digitalWrite(BUZZER_PIN, LOW); 
-                break;
-        case 3: Serial.print("Leaning Right"); 
-                digitalWrite(LED_PIN, HIGH); 
-                digitalWrite(BUZZER_PIN, HIGH); 
-                delay(200); 
-                digitalWrite(BUZZER_PIN, LOW); 
-                delay(100); 
-                digitalWrite(BUZZER_PIN, HIGH); 
-                delay(200); 
-                digitalWrite(BUZZER_PIN, LOW); 
-                break;
-        default: Serial.print("Unknown"); 
-                 digitalWrite(LED_PIN, HIGH); 
-                 break;
-      }
+      Serial.print(" (Probability: ");
+      Serial.print(maxProb);
       Serial.println(") - Logged");
     } else if (command.startsWith("user ")) {
       int userId = command.substring(5).toInt();
@@ -434,7 +367,6 @@ void loop() {
     } else if (command == "help") {
       Serial.println("Available commands:");
       Serial.println("p1-p5: Read pressure sensors 1-5");
-      Serial.println("v1-v4: Read vibration sensors 1-4");
       Serial.println("f1-f2: Read flex sensors 1-2");
       Serial.println("led on/off: Control LED");
       Serial.println("buzz: Beep buzzer");

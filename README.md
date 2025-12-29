@@ -8,7 +8,7 @@ Prolonged sitting with poor posture leads to chronic back pain, spinal misalignm
 
 ## System Overview
 
-The Smart Chair is a sensor-based monitoring device built on the ESP32 microcontroller platform. It continuously reads data from multiple sensors embedded in the chair seat and backrest to evaluate the user's sitting posture. When improper posture is detected, the system activates visual and audio alerts to prompt the user to correct their position.
+The Smart Chair is a sensor-based monitoring device built on the ESP32 microcontroller platform. It uses machine learning to classify sitting posture from sensor data. The system focuses on TensorFlow Lite Random Forest inference for posture prediction.
 
 The system operates autonomously without requiring external connectivity, processing all sensor data locally on the ESP32 for immediate feedback.
 
@@ -38,11 +38,11 @@ The system operates autonomously without requiring external connectivity, proces
 - Connected to ESP32 ADC pins: GPIO 37, 38
 - Purpose: Detect slouching or excessive backward lean
 
-**4 Vibration Sensors**
+**4 Vibration Motors**
 - Positioned near pressure sensors on seat surface
-- Digital output (HIGH when vibration detected)
+- Digital output for haptic feedback
 - Connected to ESP32 GPIO pins: 16, 17, 18, 19
-- Purpose: Detect excessive movement or fidgeting indicating discomfort
+- Purpose: Provide tactile feedback for posture correction
 
 ### Actuators
 
@@ -63,50 +63,26 @@ The system operates autonomously without requiring external connectivity, proces
 
 ## Posture Detection Algorithm
 
-The system uses a threshold-based algorithm to evaluate posture in real-time:
+The system uses a TensorFlow Lite Micro Random Forest model for posture classification:
 
 ### Data Acquisition
 1. Read analog values from all 5 pressure sensors (0-4095 range on ESP32 ADC)
 2. Read analog values from 2 flex sensors (0-4095 range)
-3. Read digital states from 4 vibration sensors (0 or 1)
+3. Normalize sensor values to 0-1 range for model input
 
-### Posture Evaluation Logic
+### Machine Learning Model
+- **Algorithm**: Random Forest Classifier
+- **Framework**: TensorFlow Lite Micro
+- **Input Features**: 7 normalized sensor values (5 pressure + 2 flex)
+- **Output**: Multi-class posture classification probabilities
+- **Classes**: Good Posture, Slouching, Leaning Left, Leaning Right, etc.
 
-**Good Posture Criteria:**
-- Pressure is evenly distributed across all 5 sensors (variance below threshold)
-- Both flex sensors show minimal bending (values within acceptable range indicating upright back)
-- No excessive vibration detected
-
-**Bad Posture Indicators:**
-- Uneven pressure distribution (one or more sensors significantly higher/lower than others)
-- Flex sensors indicate slouching (high resistance change)
-- One side of the seat has more pressure than the other (lateral imbalance)
-- Continuous vibration indicating restlessness
-
-### Decision Logic
-```
-IF (pressure_variance > THRESHOLD_PRESSURE) THEN
-    posture = BAD
-ELSE IF (flex_sensor_1 > THRESHOLD_FLEX OR flex_sensor_2 > THRESHOLD_FLEX) THEN
-    posture = BAD
-ELSE IF (pressure_front_sensors >> pressure_back_sensors) THEN
-    posture = BAD (leaning too far forward)
-ELSE
-    posture = GOOD
-END IF
-```
+### Model Inference
+The ESP32 runs the TFLite model locally to predict posture class from sensor data. The predicted class with highest probability is selected as the final posture assessment.
 
 ### System Response
 
-**If Posture is NOT OK:**
-- Turn LED ON
-- Activate buzzer (short beep pattern)
-- Continue monitoring
-
-**If Posture is OK:**
-- Turn LED OFF
-- Buzzer remains silent
-- Continue monitoring
+The system provides posture prediction results via serial output. The predicted posture class and confidence probability are logged for analysis. No automatic corrective actions are taken - the focus is on the ML prediction algorithm.
 
 ## System Flowchart
 
@@ -123,40 +99,26 @@ graph TD
     H --> I{Command Type?}
     
     I -->|p1-p5| J[Read Pressure Sensor]
-    I -->|v1-v4| K[Read Vibration Sensor]
     I -->|f1-f2| L[Read Flex Sensor]
     I -->|led on/off| M[Control LED]
     I -->|buzz| N[Activate Buzzer]
     I -->|all| O[Read All Sensors]
+    I -->|predict| PP[Run ML Inference]
     I -->|help| P[Display Help Menu]
     
     J --> Q[Send Reading to Serial]
-    K --> Q
     L --> Q
     M --> Q
     N --> Q
     O --> R[Process All Sensor Data]
+    PP --> QQ[Output Prediction]
     P --> Q
     
-    R --> S[Calculate Pressure Variance]
-    S --> T[Evaluate Flex Sensor Values]
-    T --> U{Posture Evaluation}
+    R --> S[Display Sensor Readings]
     
-    U -->|Uneven Pressure| V[BAD POSTURE]
-    U -->|Excessive Flex| V
-    U -->|Forward Lean| V
-    U -->|All OK| W[GOOD POSTURE]
+    S --> Q
     
-    V --> X[LED ON]
-    V --> Y[Buzzer BEEP]
-    
-    W --> Z[LED OFF]
-    W --> AA[Buzzer Silent]
-    
-    X --> Q
-    Y --> Q
-    Z --> Q
-    AA --> Q
+    QQ --> Q
     
     Q --> G
 ```
@@ -180,7 +142,6 @@ The system operates in command-driven mode for testing and debugging:
 
 ### Available Commands
 - `p1` to `p5`: Read individual pressure sensors
-- `v1` to `v4`: Read individual vibration sensors
 - `f1` to `f2`: Read individual flex sensors
 - `led on` / `led off`: Control LED state
 - `buzz`: Test buzzer
@@ -202,9 +163,8 @@ The system includes TensorFlow Lite for Microcontrollers to run a Random Forest 
 
 ### Model Input Features
 - 5 pressure sensor readings (normalized 0-1)
-- 4 vibration sensor states (0 or 1)
 - 2 flex sensor readings (normalized 0-1)
-- Total: 11 input features
+- Total: 7 input features
 
 ### Model Output
 - Multi-class classification with probabilities for each posture type
@@ -212,7 +172,7 @@ The system includes TensorFlow Lite for Microcontrollers to run a Random Forest 
 - System selects the class with highest probability
 
 ### Firmware Commands
-- `predict`: Runs ML inference on current sensor readings, controls actuators, and logs data
+- `predict`: Runs ML inference on current sensor readings and logs the predicted posture class
 - `user X`: Select user profile (0-4) for personalized calibration
 - `calibrate`: Calibrate sensors for current user (sit in good posture)
 - `logs`: Export historical posture data for analysis
@@ -245,10 +205,10 @@ To update the model:
 | Pressure Sensor 3 | 34 | Analog Input | ADC1, Input-only |
 | Pressure Sensor 4 | 35 | Analog Input | ADC1, Input-only |
 | Pressure Sensor 5 | 36 | Analog Input | ADC1, Input-only |
-| Vibration Sensor 1 | 16 | Digital Input | Safe GPIO |
-| Vibration Sensor 2 | 17 | Digital Input | Safe GPIO |
-| Vibration Sensor 3 | 18 | Digital Input | Safe GPIO |
-| Vibration Sensor 4 | 19 | Digital Input | Safe GPIO |
+| Vibration Motor 1 | 16 | Digital Output | Safe GPIO |
+| Vibration Motor 2 | 17 | Digital Output | Safe GPIO |
+| Vibration Motor 3 | 18 | Digital Output | Safe GPIO |
+| Vibration Motor 4 | 19 | Digital Output | Safe GPIO |
 | Flex Sensor 1 | 37 | Analog Input | ADC1, Input-only |
 | Flex Sensor 2 | 38 | Analog Input | ADC1, Input-only |
 | LED Indicator | 2 | Digital Output | Built-in LED compatible |
@@ -261,7 +221,7 @@ All pin assignments avoid conflicts with ESP32 boot pins, flash pins, and WiFi o
 ### Hardware Assembly
 1. Mount 5 pressure sensors on chair seat in grid pattern (corners + center)
 2. Attach 2 flex sensors vertically on chair backrest (left and right side)
-3. Place 4 vibration sensors near pressure sensors on seat
+3. Place 4 vibration motors near pressure sensors on seat
 4. Connect all sensor outputs to designated ESP32 GPIO pins
 5. Connect LED and buzzer to designated output pins
 6. Provide 5V power to ESP32 via USB or DC adapter
