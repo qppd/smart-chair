@@ -170,21 +170,42 @@ This command-based approach allows for component-level testing and validation du
 The system includes TensorFlow Lite for Microcontrollers to run a Random Forest model for posture classification. This provides more sophisticated posture detection compared to simple threshold-based logic.
 
 ### Model Training
-1. Collect sensor data from multiple users in good and bad posture positions
-2. Label the data (0 = good posture, 1 = bad posture)
+1. Collect sensor data from multiple users in various posture positions
+2. Label the data with appropriate posture classes:
+   - **0 = Good Posture**: Proper upright sitting with even weight distribution
+   - **1 = Slouching**: Forward leaning with rounded back (flex sensors detect curvature)
+   - **2 = Leaning Left**: Weight shifted to left side (pressure sensors show imbalance)
+   - **3 = Leaning Right**: Weight shifted to right side (pressure sensors show imbalance)
+   - **4 = Leaning Forward**: Too far forward on seat (pressure distribution indicates forward shift)
+   - **5 = Leaning Backward**: Too far back on seat (pressure distribution indicates backward shift)
 3. Train a Random Forest classifier using scikit-learn in Python
 4. Convert the trained model to TensorFlow Lite format (.tflite)
 5. Embed the model bytes into the ESP32 firmware
 
-### Model Input Features
-- 5 pressure sensor readings (normalized 0-1)
-- 2 flex sensor readings (normalized 0-1)
-- Total: 7 input features
+### Data Collection Methodology
+- **Participants**: Collect data from 5-10 users of different body types and sizes
+- **Positions per User**: 20-30 samples per posture class (100-200 total samples per user)
+- **Sensor Calibration**: Each user performs baseline calibration first
+- **Data Capture**: Use serial commands (`all` command) to collect raw sensor readings
+- **Labeling**: Manually label each captured sample based on observed posture
+- **Validation**: Cross-validate labels by having multiple observers confirm posture classes
 
 ### Model Output
 - Multi-class classification with probabilities for each posture type
-- Classes: 0=Good Posture, 1=Slouching, 2=Leaning Left, 3=Leaning Right (customizable)
+- Classes:
+  - **0 = Good Posture**: Proper sitting position
+  - **1 = Slouching**: Excessive forward bending detected by flex sensors
+  - **2 = Leaning Left**: Uneven pressure distribution favoring left side
+  - **3 = Leaning Right**: Uneven pressure distribution favoring right side
+  - **4 = Leaning Forward**: Pressure concentrated toward front of seat
+  - **5 = Leaning Backward**: Pressure concentrated toward back of seat
 - System selects the class with highest probability
+
+### Model Performance Expectations
+- **Accuracy Target**: 85-95% classification accuracy across all posture classes
+- **Real-time Inference**: <100ms processing time on ESP32
+- **Memory Usage**: <50KB for model storage and inference
+- **Cross-validation**: Use 80/20 train/test split with stratified sampling
 
 ### Firmware Commands
 - `predict`: Runs ML inference on current sensor readings and logs the predicted posture class
