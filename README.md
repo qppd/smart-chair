@@ -11,59 +11,36 @@ A real-time embedded system for intelligent sitting posture detection and monito
 
 ## Table of Contents
 
-1. [Problem Statement and Motivation](#problem-statement-and-motivation)
-2. [System Overview](#system-overview)
-3. [Key Features](#key-features)
-4. [Hardware Architecture](#hardware-architecture)
+1. [System Overview](#system-overview)
+2. [Key Features](#key-features)
+3. [Hardware Architecture](#hardware-architecture)
    - [Component Specifications](#component-specifications)
    - [Pin Mapping Table](#pin-mapping-table)
    - [Power Requirements](#power-requirements)
-5. [Wiring Overview](#wiring-overview)
-6. [Software Architecture](#software-architecture)
+4. [Wiring Overview](#wiring-overview)
+5. [Software Architecture](#software-architecture)
    - [Firmware Overview](#firmware-overview)
    - [Data Structures](#data-structures)
    - [File Structure](#file-structure)
-7. [Machine Learning Pipeline](#machine-learning-pipeline)
+6. [Machine Learning Pipeline](#machine-learning-pipeline)
    - [Sensor Data Preparation](#sensor-data-preparation)
    - [Model Training Workflow](#model-training-workflow)
    - [TensorFlow Lite Micro Integration](#tensorflow-lite-micro-integration)
-8. [System Flow](#system-flow)
-9. [Serial Command Interface](#serial-command-interface)
-10. [Calibration and User Profiles](#calibration-and-user-profiles)
-11. [Data Logging and Export](#data-logging-and-export)
-12. [Performance and Resource Usage](#performance-and-resource-usage)
-13. [Limitations](#limitations)
-14. [Future Improvements](#future-improvements)
-15. [Installation and Setup](#installation-and-setup)
+7. [System Flow](#system-flow)
+8. [Serial Command Interface](#serial-command-interface)
+9. [Calibration and User Profiles](#calibration-and-user-profiles)
+10. [Data Logging and Export](#data-logging-and-export)
+11. [Performance and Resource Usage](#performance-and-resource-usage)
+12. [Limitations](#limitations)
+13. [Future Improvements](#future-improvements)
+14. [Installation and Setup](#installation-and-setup)
     - [Hardware Assembly](#hardware-assembly)
     - [Arduino IDE Setup](#arduino-ide-setup)
     - [ESP32 Configuration](#esp32-configuration)
-16. [Project Structure](#project-structure)
-17. [License](#license)
-18. [Contributing Guidelines](#contributing-guidelines)
-19. [Author and Credits](#author-and-credits)
-
----
-
-## Problem Statement and Motivation
-
-Prolonged sitting with poor posture is a pervasive issue in modern workplaces and home environments, contributing to a wide range of musculoskeletal disorders (MSDs), including chronic lower back pain, cervical spondylosis, spinal misalignment, and repetitive strain injuries. According to epidemiological studies, approximately 80% of adults experience back pain at some point in their lives, with poor sitting posture identified as a primary contributing factor.
-
-The consequences of poor posture extend beyond physical discomfort:
-- **Chronic pain**: Sustained pressure on spinal discs and misalignment of vertebrae lead to persistent pain.
-- **Reduced productivity**: Pain and discomfort reduce cognitive performance and workplace efficiency.
-- **Long-term disability**: Untreated postural issues can result in permanent structural damage requiring medical intervention.
-- **Lack of awareness**: Most individuals are unaware of their sitting posture throughout the day, making correction difficult.
-
-Existing commercial solutions are either prohibitively expensive, require invasive modifications to furniture, or rely on external cloud services that compromise user privacy. There is a clear need for an affordable, open-source, and privacy-respecting posture monitoring system that operates autonomously and provides real-time feedback.
-
-This project addresses these challenges by developing an embedded system that:
-- Monitors sitting posture in real-time using multimodal sensor fusion.
-- Employs machine learning for accurate posture classification.
-- Operates entirely offline without requiring internet connectivity.
-- Provides multimodal feedback (haptic, visual, auditory) for immediate corrective action.
-- Supports personalized calibration and multi-user profiles.
-- Is open-source, extensible, and affordable.
+15. [Project Structure](#project-structure)
+16. [License](#license)
+17. [Contributing Guidelines](#contributing-guidelines)
+18. [Author and Credits](#author-and-credits)
 
 ---
 
