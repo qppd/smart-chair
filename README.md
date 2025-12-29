@@ -19,7 +19,7 @@ The system operates autonomously without requiring external connectivity, proces
 - Dual-core processor running at 240 MHz
 - 520 KB SRAM for sensor data processing
 - Multiple GPIO pins with ADC capability for analog sensor input
-- Handles all sensor reading, posture evaluation logic, and actuator control
+- Handles all sensor reading, TensorFlow Lite inference, and actuator control
 - Powered via USB or external 5V DC supply
 
 ### Sensors
@@ -123,7 +123,7 @@ graph TD
     Q --> G
 ```
 
-## Firmware Logic Overview
+## System Operation
 
 The firmware is written in Arduino C++ for the ESP32 platform. The main program structure consists of:
 
@@ -179,9 +179,9 @@ The system includes TensorFlow Lite for Microcontrollers to run a Random Forest 
 
 ### User Profiles and Calibration
 - Supports up to 5 user profiles stored in ESP32 SPIFFS
-- Each profile includes personalized baseline readings and thresholds
+- Each profile includes personalized baseline readings for reference
 - Calibration process: User sits in correct posture, system records baseline values
-- Dynamic thresholds adapt to user's body type and weight
+- Baseline data stored for user identification and logging purposes
 
 ### Data Logging
 - Stores last 100 posture predictions with timestamps and sensor data
@@ -241,7 +241,7 @@ All pin assignments avoid conflicts with ESP32 boot pins, flash pins, and WiFi o
 3. Open Serial Monitor at 9600 baud
 4. Use serial commands to test individual components
 5. Observe sensor readings and actuator responses
-6. Verify posture detection logic by simulating different sitting positions
+6. Verify ML posture prediction by simulating different sitting positions
 
 ## Wiring Diagram
 
@@ -266,7 +266,7 @@ smart-chair/
 
 ## Limitations
 
-1. **Calibration Dependency**: Users must perform initial calibration for accurate personalized thresholds
+1. **Calibration Dependency**: Users must perform initial calibration for personalized baseline readings
 2. **Limited User Profiles**: Maximum of 5 user profiles supported due to ESP32 storage constraints
 3. **Model Accuracy**: ML model performance depends on quality and quantity of training data
 4. **Storage Capacity**: Posture logs limited to last 100 entries due to RAM constraints
