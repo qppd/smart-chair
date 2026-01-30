@@ -849,6 +849,10 @@ smart-chair/
 ├── README.md                    # This file
 ├── diagram/                     # System diagrams and schematics
 │   └── (Wiring diagrams, images, etc.)
+├── model/                       # 3D models for 3D printing
+│   ├── Smart_Chair_Board_Case.stl
+│   ├── Smart_Chair_Board_Case_Top_Cover.stl
+│   └── Smart_Chair_Board_Case.png
 ├── source/                      # Source code
 │   └── SmartChair/              # Arduino sketch folder
 │       └── SmartChair.ino       # Main firmware file (ESP32 Arduino C++)
