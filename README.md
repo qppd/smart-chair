@@ -60,7 +60,8 @@ This prototype is designed for research, education, and personal use, demonstrat
 
 - **Real-Time Posture Monitoring**: Continuous acquisition and classification of sitting posture at user-defined intervals.
 - **Machine Learning Classification**: TensorFlow Lite Micro Random Forest model for multi-class posture prediction with six distinct posture categories.
-- **Multimodal Sensor Fusion**: Integration of five pressure sensors and two flex sensors for comprehensive posture assessment.
+- **Multimodal Sensor Fusion**: Integration of four HX711 load-cell amplifiers (pressure in Pascals), four flex sensors, and vibration / LED / buzzer actuators for comprehensive posture assessment.
+- **Calibrated Pressure Measurement**: HX711 load cells calibrated using a known weight (F = m·g); pressure computed as P = F / A over a 15 cm × 15 cm sensor pad (A = 0.0225 m²).
 - **Personalized Calibration**: Per-user baseline calibration to account for individual body weight, size, and sitting preferences.
 - **Multi-User Profiles**: Support for up to five user profiles with persistent storage via SPIFFS.
 - **Haptic Feedback**: Four independently controllable vibration motors positioned strategically on the seat for targeted tactile feedback.
@@ -101,13 +102,23 @@ The ESP32 was selected for its balance of computational power, low cost, extensi
 - **Placement**: Distributed across seat surface (left rear, right rear, center, left front, right front)
 - **Purpose**: Measure weight distribution to detect leaning, slouching, and uneven sitting
 
-**2x Flex Sensors (Spectra Symbol 4.5" or similar)**
+**4x Flex Sensors (Spectra Symbol 4.5" or similar)**
 - **Type**: Variable resistor, resistance increases with bending
 - **Bend Range**: 0 to 90 degrees
 - **Output**: Analog resistance
-- **Interface**: Voltage divider circuit connected to ESP32 ADC
-- **Placement**: Vertically mounted on left and right sides of backrest
+- **Interface**: Voltage divider circuit connected to ESP32 ADC1 (GPIO 34, 35, 36, 39 – input-only)
+- **Placement**: Vertically mounted on backrest (left, right, upper-left, upper-right)
 - **Purpose**: Detect forward slouching, backward leaning, and lateral back curvature
+
+**4x HX711 Load Cell Amplifiers with Load Cells**
+- **Type**: 24-bit ADC with integrated amplifier for Wheatstone bridge load cells
+- **Resolution**: 24-bit (approx. 16 million counts)
+- **Interface**: 2-wire serial (DOUT + SCK) per module
+- **Sensor Pad Area**: 15 cm × 15 cm per sensor (A = 0.0225 m²)
+- **Calibration**: Place a known mass (e.g. 1 kg → F = 9.81 N → P = 436 Pa) and run `calibrate hx <1-4> <known_grams>` over serial
+- **Pressure Formula**: P (Pa) = (mass_kg × 9.81) / 0.0225
+- **Placement**: Four corners of the seat (front-left, front-right, rear-left, rear-right)
+- **Purpose**: Measure actual pressure distribution across the seat in Pascals
 
 **4x Vibration Motors (Coin-type DC motors)**
 - **Type**: Eccentric rotating mass (ERM) vibration motor
@@ -151,23 +162,28 @@ The ESP32 was selected for its balance of computational power, low cost, extensi
 
 The following table provides the complete GPIO pin assignment for the ESP32 38-pin development board. Pin selection avoids GPIO 0, 1, 6-11 (flash interface), GPIO 12 (boot mode), and other pins with special boot behaviors.
 
-| **Component**         | **ESP32 GPIO Pin** | **Pin Type**       | **Notes**                                      |
-|-----------------------|--------------------|--------------------|------------------------------------------------|
-| Pressure Sensor 1     | GPIO 32            | ADC1_CH4 (Input)   | Left rear seat position                        |
-| Pressure Sensor 2     | GPIO 33            | ADC1_CH5 (Input)   | Right rear seat position                       |
-| Pressure Sensor 3     | GPIO 34            | ADC1_CH6 (Input)   | Center seat position (input-only pin)          |
-| Pressure Sensor 4     | GPIO 35            | ADC1_CH7 (Input)   | Left front seat position (input-only pin)      |
-| Pressure Sensor 5     | GPIO 36 (SVP)      | ADC1_CH0 (Input)   | Right front seat position (input-only pin)     |
-| Flex Sensor 1         | GPIO 37            | ADC1_CH1 (Input)   | Left backrest (input-only pin)                 |
-| Flex Sensor 2         | GPIO 38            | ADC1_CH2 (Input)   | Right backrest (input-only pin)                |
-| Vibration Motor 1     | GPIO 16            | Digital Output     | Left rear haptic feedback                      |
-| Vibration Motor 2     | GPIO 17            | Digital Output     | Right rear haptic feedback                     |
-| Vibration Motor 3     | GPIO 18            | Digital Output     | Left front haptic feedback                     |
-| Vibration Motor 4     | GPIO 19            | Digital Output     | Right front haptic feedback                    |
-| LED Indicator         | GPIO 2             | Digital Output     | Onboard LED (some boards), safe for output     |
-| Buzzer                | GPIO 4             | Digital Output     | Audio alert                                    |
+| **Component**              | **ESP32 GPIO Pin**   | **Pin Type**         | **Notes**                                      |
+|----------------------------|----------------------|----------------------|------------------------------------------------|
+| Flex Sensor 1              | GPIO 34              | ADC1_CH6 (Input)     | Backrest flex – input-only pin                 |
+| Flex Sensor 2              | GPIO 35              | ADC1_CH7 (Input)     | Backrest flex – input-only pin                 |
+| Flex Sensor 3              | GPIO 36 (SVP)        | ADC1_CH0 (Input)     | Backrest flex – input-only pin                 |
+| Flex Sensor 4              | GPIO 39 (VN)         | ADC1_CH3 (Input)     | Backrest flex – input-only pin                 |
+| HX711-1 DOUT (front-left)  | GPIO 5               | Digital Input        | Load cell data line                            |
+| HX711-1 SCK  (front-left)  | GPIO 25              | Digital Output       | Load cell clock line                           |
+| HX711-2 DOUT (front-right) | GPIO 26              | Digital Input        | Load cell data line                            |
+| HX711-2 SCK  (front-right) | GPIO 27              | Digital Output       | Load cell clock line                           |
+| HX711-3 DOUT (rear-left)   | GPIO 32              | ADC1_CH4 / Digital   | Load cell data line                            |
+| HX711-3 SCK  (rear-left)   | GPIO 33              | ADC1_CH5 / Digital   | Load cell clock line                           |
+| HX711-4 DOUT (rear-right)  | GPIO 21              | I2C SDA / Digital    | Load cell data line                            |
+| HX711-4 SCK  (rear-right)  | GPIO 22              | I2C SCL / Digital    | Load cell clock line                           |
+| Vibration Motor 1          | GPIO 19              | Digital Output       | Front-left haptic feedback                     |
+| Vibration Motor 2          | GPIO 18              | Digital Output       | Front-right haptic feedback                    |
+| Vibration Motor 3          | GPIO 13              | Digital Output       | Rear-left haptic feedback                      |
+| Vibration Motor 4          | GPIO 14              | Digital Output       | Rear-right haptic feedback                     |
+| LED Indicator              | GPIO 12              | Digital Output       | Visual posture alert                           |
+| Buzzer                     | GPIO 23              | Digital Output       | Audio alert                                    |
 
-**Note**: GPIO 34-39 are input-only pins and cannot be used for output. They are ideal for analog sensor readings.
+**Note**: GPIO 34-39 are input-only pins and cannot be used for output. They are ideal for analog sensor readings. GPIO 21/22 and 32/33 are used for HX711 digital communication and must not be connected to I²C or ADC peripherals simultaneously.
 
 ---
 
@@ -182,10 +198,9 @@ The system is designed to operate from a standard USB power source or an externa
 - **Buzzer (active)**: ~30 mA
 - **Single Vibration Motor (active)**: ~80 mA
 - **Four Vibration Motors (all active)**: ~320 mA
+  - **Four HX711 modules (active)**: ~4 mA (1 mA each)
 
-**Worst-Case Total Current**: ~520 mA (all actuators active simultaneously)
-
-A 5V, 1A power supply is sufficient for typical operation. A 1.5A supply is recommended for margin and future expansion.
+**Worst-Case Total Current**: ~525 mA (all actuators and HX711 modules active simultaneously)
 
 ---
 
@@ -242,22 +257,20 @@ Both are controlled directly via GPIO pins with current-limiting resistors for t
 graph TD
     A[5V Power Supply<br/>USB or DC Adapter] --> B[ESP32 38-Pin<br/>Development Board<br/>Dual-Core 240MHz]
     
-    B -->|GPIO 32 ADC| C1[Pressure Sensor 1<br/>Left Rear Seat]
-    B -->|GPIO 33 ADC| C2[Pressure Sensor 2<br/>Right Rear Seat]
-    B -->|GPIO 34 ADC| C3[Pressure Sensor 3<br/>Center Seat]
-    B -->|GPIO 35 ADC| C4[Pressure Sensor 4<br/>Left Front Seat]
-    B -->|GPIO 36 ADC| C5[Pressure Sensor 5<br/>Right Front Seat]
-    
-    B -->|GPIO 37 ADC| D1[Flex Sensor 1<br/>Left Backrest]
-    B -->|GPIO 38 ADC| D2[Flex Sensor 2<br/>Right Backrest]
-    
-    B -->|GPIO 16 Output| E1[Vibration Motor 1<br/>Left Rear]
-    B -->|GPIO 17 Output| E2[Vibration Motor 2<br/>Right Rear]
-    B -->|GPIO 18 Output| E3[Vibration Motor 3<br/>Left Front]
-    B -->|GPIO 19 Output| E4[Vibration Motor 4<br/>Right Front]
-    
-    B -->|GPIO 2 Output| F[LED Indicator<br/>Visual Feedback]
-    B -->|GPIO 4 Output| G[Buzzer<br/>Audio Alert]
+    B -->|GPIO 34/35/36/39 ADC| D1[Flex Sensors 1-4<br/>Backrest Curvature]
+
+    B -->|GPIO 5/25 DOUT/SCK| H1[HX711-1<br/>Front-Left Load Cell]
+    B -->|GPIO 26/27 DOUT/SCK| H2[HX711-2<br/>Front-Right Load Cell]
+    B -->|GPIO 32/33 DOUT/SCK| H3[HX711-3<br/>Rear-Left Load Cell]
+    B -->|GPIO 21/22 DOUT/SCK| H4[HX711-4<br/>Rear-Right Load Cell]
+
+    B -->|GPIO 19 Output| E1[Vibration Motor 1<br/>Front-Left]
+    B -->|GPIO 18 Output| E2[Vibration Motor 2<br/>Front-Right]
+    B -->|GPIO 13 Output| E3[Vibration Motor 3<br/>Rear-Left]
+    B -->|GPIO 14 Output| E4[Vibration Motor 4<br/>Rear-Right]
+
+    B -->|GPIO 12 Output| F[LED Indicator<br/>Visual Feedback]
+    B -->|GPIO 23 Output| G[Buzzer<br/>Audio Alert]
     
     B -->|USB UART| H[Serial Interface<br/>Command Input<br/>Data Export]
     
@@ -567,39 +580,29 @@ flowchart TD
 
 ## Serial Command Interface
 
-The system provides an interactive command-line interface over the serial connection (9600 baud, 8N1) for debugging, testing, and manual control. Commands are sent as plain text strings terminated by newline (`\n`).
+The system provides an interactive command-line interface over the serial connection (115200 baud, 8N1) for debugging, testing, and manual control. Commands are sent as plain text strings terminated by newline (`\n`).
 
 ### Command Reference Table
 
-| **Command**       | **Description**                                                                 | **Example Output**                          |
-|-------------------|---------------------------------------------------------------------------------|---------------------------------------------|
-| `p1`              | Read and print Pressure Sensor 1 ADC value.                                     | `Pressure Sensor 1: 2345`                   |
-| `p2`              | Read and print Pressure Sensor 2 ADC value.                                     | `Pressure Sensor 2: 1876`                   |
-| `p3`              | Read and print Pressure Sensor 3 ADC value.                                     | `Pressure Sensor 3: 3021`                   |
-| `p4`              | Read and print Pressure Sensor 4 ADC value.                                     | `Pressure Sensor 4: 1654`                   |
-| `p5`              | Read and print Pressure Sensor 5 ADC value.                                     | `Pressure Sensor 5: 2987`                   |
-| `f1`              | Read and print Flex Sensor 1 ADC value.                                         | `Flex Sensor 1: 1234`                       |
-| `f2`              | Read and print Flex Sensor 2 ADC value.                                         | `Flex Sensor 2: 1456`                       |
-| `all`             | Read and print all sensor values (5 pressure + 2 flex).                         | `Pressure: 2345, 1876, ...\nFlex: 1234, 1456` |
-| `led on`          | Turn LED indicator on (GPIO 2 HIGH).                                            | `LED turned ON`                             |
-| `led off`         | Turn LED indicator off (GPIO 2 LOW).                                            | `LED turned OFF`                            |
-| `buzz`            | Activate buzzer for 200ms.                                                      | `Buzzer beeped`                             |
-| `vib1 on`         | Turn Vibration Motor 1 on (GPIO 16 HIGH).                                       | `Vibration Motor 1: ON`                     |
-| `vib1 off`        | Turn Vibration Motor 1 off (GPIO 16 LOW).                                       | `Vibration Motor 1: OFF`                    |
-| `vib2 on`         | Turn Vibration Motor 2 on (GPIO 17 HIGH).                                       | `Vibration Motor 2: ON`                     |
-| `vib2 off`        | Turn Vibration Motor 2 off (GPIO 17 LOW).                                       | `Vibration Motor 2: OFF`                    |
-| `vib3 on`         | Turn Vibration Motor 3 on (GPIO 18 HIGH).                                       | `Vibration Motor 3: ON`                     |
-| `vib3 off`        | Turn Vibration Motor 3 off (GPIO 18 LOW).                                       | `Vibration Motor 3: OFF`                    |
-| `vib4 on`         | Turn Vibration Motor 4 on (GPIO 19 HIGH).                                       | `Vibration Motor 4: ON`                     |
-| `vib4 off`        | Turn Vibration Motor 4 off (GPIO 19 LOW).                                       | `Vibration Motor 4: OFF`                    |
-| `vib all on`      | Turn all vibration motors on simultaneously.                                    | `All Vibration Motors: ON`                  |
-| `vib all off`     | Turn all vibration motors off simultaneously.                                   | `All Vibration Motors: OFF`                 |
-| `predict`         | Acquire sensor data, run ML inference, log result, and print predicted posture. | `ML Prediction - Class: 2 (Probability: 0.89) - Logged` |
-| `user X`          | Select user profile X (0-4) as the active user.                                 | `Selected user: 2`                          |
-| `calibrate`       | Start calibration routine for the current user (requires `user X` first).       | `Starting calibration...`                   |
-| `calib done`      | Complete calibration and save baseline values (used during calibration).        | `Calibration complete`                      |
-| `logs`            | Export all logged posture events to serial in CSV format.                       | `Time: 12345, Class: 0, Data: 2345,1876,...` |
-| `help`            | Print list of all available commands.                                           | `Available commands: p1-p5, f1-f2, ...`     |
+| **Command**                      | **Description**                                                                 | **Example Output**                                |
+|----------------------------------|---------------------------------------------------------------------------------|---------------------------------------------------|
+| `buzzer on` / `buzzer off`       | Toggle buzzer.                                                                  | `Buzzer ON`                                       |
+| `led on` / `led off`             | Toggle LED indicator (GPIO 12).                                                 | `LED ON`                                          |
+| `vibration on/off`               | Toggle Vibration Motor 1 (GPIO 19).                                             | `Vibration ON`                                    |
+| `vibration2 on/off`              | Toggle Vibration Motor 2 (GPIO 18).                                             | `Vibration2 OFF`                                  |
+| `vibration3 on/off`              | Toggle Vibration Motor 3 (GPIO 13).                                             | `Vibration3 ON`                                   |
+| `vibration4 on/off`              | Toggle Vibration Motor 4 (GPIO 14).                                             | `Vibration4 OFF`                                  |
+| `test flex1` – `test flex4`       | Start 10-second monitoring window for the specified flex sensor.                | `Testing Flex1 for 10 s...`                       |
+| `tare hx <1-4>`                  | Zero (tare) the specified HX711 load cell with no load applied.                 | `HX711-2 tared.`                                  |
+| `calibrate hx <1-4> <grams>`     | Place the known mass (grams) on the sensor then send this command. The firmware waits 5 s, reads 20 samples, and derives the scale factor. | `HX711-1 new scale factor: 2340.5000` |
+
+Every second, the firmware also prints live flex sensor ADC readings. Every 2 seconds it prints HX711 pressure readings for all four load cells:
+```
+── HX711 Pressure (Pa) ────────────────────
+  FL: 120.45  FR: 118.22  RL: 130.10  RR: 125.88
+  Total: 494.65 Pa
+─────────────────────────────────────────
+```
 
 ---
 
@@ -607,17 +610,30 @@ The system provides an interactive command-line interface over the serial connec
 
 Calibration is essential for personalizing the system to individual users, accounting for differences in body weight, size, and preferred sitting position. Each user establishes a baseline "good posture" profile against which deviations are measured.
 
-### Calibration Process
+### HX711 Load Cell Calibration
 
-1. **Select User**: Issue the `user X` command (X = 0-4) to select a user profile slot.
-2. **Initiate Calibration**: Issue the `calibrate` command. The system prompts the user to sit in their optimal posture.
-3. **User Positioning**: The user adjusts their seating position to achieve correct ergonomic posture (back supported, weight evenly distributed, spine aligned).
-4. **Confirm Calibration**: User sends the `calib done` command via serial.
-5. **Baseline Capture**: The system reads all sensor values and stores them in the `CalibrationData` structure for the selected user.
-6. **Threshold Calculation**: Deviation thresholds are set (e.g., 20% for pressure sensors, 30% for flex sensors).
-7. **Persistent Storage**: Calibration data is saved to SPIFFS (`/profiles.dat`) and persists across power cycles.
+Each HX711 module requires a one-time calibration to determine the scale factor (raw ADC counts per gram):
 
-### User Profile Management
+1. Ensure no load is on the sensor, then send: `tare hx <1-4>`
+2. Place a known mass on the sensor pad (e.g. a 1 kg weight).
+3. Send: `calibrate hx <1-4> 1000` (1000 g = 1 kg)
+4. The firmware waits 5 seconds, averages 20 readings, computes the scale factor, and confirms:
+   ```
+   HX711-1 new scale factor: 2340.5000
+   Verification pressure: 436.00 Pa
+   ```
+5. Repeat for all four modules.
+
+**Pressure formula**:
+$$P\,(\text{Pa}) = \frac{m\,(\text{kg}) \times 9.81\,(\text{m/s}^2)}{0.15\,(\text{m}) \times 0.15\,(\text{m})}$$
+
+Example – 1 kg dummy weight:
+- $F = 1 \times 9.81 = 9.81\,\text{N}$
+- $P = 9.81 / 0.0225 \approx 436\,\text{Pa}$
+
+### Flex Sensor Calibration
+
+
 
 Up to five user profiles are supported, enabling shared use of the chair in multi-user environments (e.g., office workstations, laboratory setups).
 
@@ -792,12 +808,18 @@ The system is **soft real-time**: posture classification does not have strict ti
    - Go to `Tools > Board > Boards Manager`.
    - Search for "esp32" and install "esp32 by Espressif Systems" (version 2.0.x or later recommended).
 
-3. **Install TensorFlow Lite for Microcontrollers**:
+3. **Install HX711 Library** (required for SmartChairV2):
+   - Go to `Sketch > Include Library > Manage Libraries`.
+   - Search for **"HX711 arduino library"** by **Bogdan Necula** (bogde).
+   - Install version 0.7.5 or later.
+   - Library source: [https://github.com/bogde/HX711](https://github.com/bogde/HX711)
+
+4. **Install TensorFlow Lite for Microcontrollers**:
    - Go to `Sketch > Include Library > Manage Libraries`.
    - Search for "TensorFlowLite_ESP32" or "TensorFlow Lite Micro".
    - Install the library compatible with ESP32 (e.g., `EloquentTinyML` or official `TensorFlowLite` library).
 
-4. **Install SPIFFS Library**:
+5. **Install SPIFFS Library**:
    - SPIFFS is included with ESP32 core; no separate installation needed.
 
 ---
