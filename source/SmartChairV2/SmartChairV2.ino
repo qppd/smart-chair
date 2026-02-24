@@ -8,13 +8,21 @@
 #define VIBRATION_PIN4 14
 #define FLEX_PIN1 34
 #define FLEX_PIN2 35
+#define FLEX_PIN3 36 
+#define FLEX_PIN4 39 
 
 bool testingFlex1 = false;
 bool testingFlex2 = false;
+bool testingFlex3 = false;
+bool testingFlex4 = false;
 unsigned long testStartTime1 = 0;
 unsigned long testStartTime2 = 0;
+unsigned long testStartTime3 = 0;
+unsigned long testStartTime4 = 0;
 unsigned long lastPrintTime1 = 0;
 unsigned long lastPrintTime2 = 0;
+unsigned long lastPrintTime3 = 0;
+unsigned long lastPrintTime4 = 0;
 unsigned long lastToggleTime = 0;
 bool beepState = false;
 unsigned long lastSensorPrintTime = 0;
@@ -33,13 +41,19 @@ void setup() {
   delay(1000); // Wait for sensors to stabilize
   int baseline1 = analogRead(FLEX_PIN1);
   int baseline2 = analogRead(FLEX_PIN2);
+  int baseline3 = analogRead(FLEX_PIN3);
+  int baseline4 = analogRead(FLEX_PIN4);
   Serial.print("Flex1 baseline (straight): ");
   Serial.println(baseline1);
   Serial.print("Flex2 baseline (straight): ");
   Serial.println(baseline2);
+  Serial.print("Flex3 baseline (straight): ");
+  Serial.println(baseline3);
+  Serial.print("Flex4 baseline (straight): ");
+  Serial.println(baseline4);
   Serial.println("Adjust thresholds in code based on these values.");
 
-  Serial.println("Testing ready. Commands: 'buzzer on/off', 'led on/off', 'vibration on/off', 'vibration2 on/off', 'vibration3 on/off', 'vibration4 on/off', 'test flex1', 'test flex2'");
+  Serial.println("Testing ready. Commands: 'buzzer on/off', 'led on/off', 'vibration on/off', 'vibration2 on/off', 'vibration3 on/off', 'vibration4 on/off', 'test flex1', 'test flex2', 'test flex3', 'test flex4'");
 }
 
 void loop() {
@@ -92,6 +106,16 @@ void loop() {
       testStartTime2 = millis();
       lastPrintTime2 = millis();
       Serial.println("Testing Flex2 for 10 seconds...");
+      } else if (command == "test flex3") {
+        testingFlex3 = true;
+        testStartTime3 = millis();
+        lastPrintTime3 = millis();
+        Serial.println("Testing Flex3 for 10 seconds...");
+      } else if (command == "test flex4") {
+        testingFlex4 = true;
+        testStartTime4 = millis();
+        lastPrintTime4 = millis();
+        Serial.println("Testing Flex4 for 10 seconds...");
     } else {
       Serial.println("Unknown command");
     }
@@ -100,17 +124,23 @@ void loop() {
   // Continuous monitoring of flex sensors
   int flex1Value = analogRead(FLEX_PIN1);
   int flex2Value = analogRead(FLEX_PIN2);
+    int flex3Value = analogRead(FLEX_PIN3);
+    int flex4Value = analogRead(FLEX_PIN4);
   bool actuateAll = false;
   
-  if (millis() - lastSensorPrintTime > 1000) {
-    Serial.print("Flex1: ");
-    Serial.print(flex1Value);
-    Serial.print(" Flex2: ");
-    Serial.println(flex2Value);
-    lastSensorPrintTime = millis();
-  }
+    if (millis() - lastSensorPrintTime > 1000) {
+      Serial.print("Flex1: ");
+      Serial.print(flex1Value);
+      Serial.print(" Flex2: ");
+      Serial.print(flex2Value);
+      Serial.print(" Flex3: ");
+      Serial.print(flex3Value);
+      Serial.print(" Flex4: ");
+      Serial.println(flex4Value);
+      lastSensorPrintTime = millis();
+    }
   
-  if (flex1Value > 2200 || flex2Value > 2200) actuateAll = true;
+    if (flex1Value > 2200 || flex2Value > 2200 || flex3Value > 2200 || flex4Value > 2200) actuateAll = true;
   if (actuateAll) {
     digitalWrite(BUZZER_PIN, HIGH);
     digitalWrite(LED_PIN, HIGH);
