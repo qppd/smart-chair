@@ -849,16 +849,36 @@ smart-chair/
 ├── README.md                    # This file
 ├── diagram/                     # System diagrams and schematics
 │   └── (Wiring diagrams, images, etc.)
-├── model/                       # 3D models for 3D printing
-│   ├── Smart_Chair_Board_Case.stl
-│   ├── Smart_Chair_Board_Case_Top_Cover.stl
-│   └── Smart_Chair_Board_Case.png
+├── model/                       # 3D models for 3D printing and design documentation
+│   ├── Smart_Chair.f3d          # Complete 3D CAD model (Fusion360)
+│   ├── Smart_Chair_Board_Case.png
+│   ├── Smart_Chair_Full_View_1.png
+│   └── Smart_Chair_Full_View_2.png
 ├── source/                      # Source code
 │   └── SmartChair/              # Arduino sketch folder
 │       └── SmartChair.ino       # Main firmware file (ESP32 Arduino C++)
 └── wiring/                      # Wiring and circuit design files
     └── Wiring.fzz               # Fritzing project file with circuit schematic
 ```
+
+---
+
+## 3D Model & Design Documentation
+
+The Smart Chair design includes comprehensive 3D modeling and visual documentation:
+
+### Design Images
+
+**Board Case Design:**
+![Smart Chair Board Case](model/Smart_Chair_Board_Case.png)
+
+**Full Assembly View 1:**
+![Smart Chair Full View 1](model/Smart_Chair_Full_View_1.png)
+
+**Full Assembly View 2:**
+![Smart Chair Full View 2](model/Smart_Chair_Full_View_2.png)
+
+The complete 3D CAD model is available in `model/Smart_Chair.f3d` (Fusion 360 format) for detailed component specifications and assembly instructions.
 
 ---
 
