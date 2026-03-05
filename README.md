@@ -110,15 +110,18 @@ The ESP32 was selected for its balance of computational power, low cost, extensi
 - **Placement**: Vertically mounted on backrest (left, right, upper-left, upper-right)
 - **Purpose**: Detect forward slouching, backward leaning, and lateral back curvature
 
-**4x HX711 Load Cell Amplifiers with Load Cells**
-- **Type**: 24-bit ADC with integrated amplifier for Wheatstone bridge load cells
-- **Resolution**: 24-bit (approx. 16 million counts)
-- **Interface**: 2-wire serial (DOUT + SCK) per module
-- **Sensor Pad Area**: 15 cm × 15 cm per sensor (A = 0.0225 m²)
-- **Calibration**: Place a known mass (e.g. 1 kg → F = 9.81 N → P = 436 Pa) and run `calibrate hx <1-4> <known_grams>` over serial
-- **Pressure Formula**: P (Pa) = (mass_kg × 9.81) / 0.0225
-- **Placement**: Four corners of the seat (front-left, front-right, rear-left, rear-right)
-- **Purpose**: Measure actual pressure distribution across the seat in Pascals
+**4x HX711 Load Cell Amplifiers with Load Cells** *(replaced in V2 FSR Edition)*
+- These modules have been fully replaced by FSR sensors (see below). All HX711 firmware code has been removed.
+
+**5x Force-Sensitive Resistors (FSR – seat pressure sensors)**
+- **Type**: Thick-film piezoresistive force sensor (e.g., Interlink FSR 402 or equivalent)
+- **Resistance Range**: ~1 MΩ (no load) down to ~200 Ω (full load ~10 kg)
+- **Interface**: Voltage divider with 10 kΩ pull-down resistor → ESP32 ADC (12-bit, 0–4095)
+- **Sensor Positions**: Rear-Right, Rear-Left, Front-Right, Front-Left, Center
+- **GPIO Pins**: 32 (RR), 33 (RL), 25 (FR), 26 (FL), 27 (CTR)
+- **Calibration**: `tare fsr <1-5>` to zero; `calibrate fsr <1-5> <grams>` to set scale factor
+- **Noise Reduction**: 8-sample averaged ADC read + exponential moving average (α = 0.20)
+- **Purpose**: Real-time seat pressure distribution; triggers per-quadrant vibration motor feedback
 
 **4x Vibration Motors (Coin-type DC motors)**
 - **Type**: Eccentric rotating mass (ERM) vibration motor
@@ -160,30 +163,43 @@ The ESP32 was selected for its balance of computational power, low cost, extensi
 
 ### Pin Mapping Table
 
-The following table provides the complete GPIO pin assignment for the ESP32 38-pin development board. Pin selection avoids GPIO 0, 1, 6-11 (flash interface), GPIO 12 (boot mode), and other pins with special boot behaviors.
+> **Hardware Revision Note (V2 FSR Edition):** The four HX711 load-cell amplifiers have been replaced with five FSR (Force-Sensitive Resistor) sensors wired directly to ESP32 ADC pins. GPIO 32/33 (previously HX711 digital lines) are now ADC1 analog inputs. GPIO 25/26/27 (previously HX711 lines) are ADC2 inputs used when WiFi is disabled.
 
-| **Component**              | **ESP32 GPIO Pin**   | **Pin Type**         | **Notes**                                      |
-|----------------------------|----------------------|----------------------|------------------------------------------------|
-| Flex Sensor 1              | GPIO 34              | ADC1_CH6 (Input)     | Backrest flex – input-only pin                 |
-| Flex Sensor 2              | GPIO 35              | ADC1_CH7 (Input)     | Backrest flex – input-only pin                 |
-| Flex Sensor 3              | GPIO 36 (SVP)        | ADC1_CH0 (Input)     | Backrest flex – input-only pin                 |
-| Flex Sensor 4              | GPIO 39 (VN)         | ADC1_CH3 (Input)     | Backrest flex – input-only pin                 |
-| HX711-1 DOUT (front-left)  | GPIO 5               | Digital Input        | Load cell data line                            |
-| HX711-1 SCK  (front-left)  | GPIO 25              | Digital Output       | Load cell clock line                           |
-| HX711-2 DOUT (front-right) | GPIO 26              | Digital Input        | Load cell data line                            |
-| HX711-2 SCK  (front-right) | GPIO 27              | Digital Output       | Load cell clock line                           |
-| HX711-3 DOUT (rear-left)   | GPIO 32              | ADC1_CH4 / Digital   | Load cell data line                            |
-| HX711-3 SCK  (rear-left)   | GPIO 33              | ADC1_CH5 / Digital   | Load cell clock line                           |
-| HX711-4 DOUT (rear-right)  | GPIO 21              | I2C SDA / Digital    | Load cell data line                            |
-| HX711-4 SCK  (rear-right)  | GPIO 22              | I2C SCL / Digital    | Load cell clock line                           |
-| Vibration Motor 1          | GPIO 19              | Digital Output       | Front-left haptic feedback                     |
-| Vibration Motor 2          | GPIO 18              | Digital Output       | Front-right haptic feedback                    |
-| Vibration Motor 3          | GPIO 13              | Digital Output       | Rear-left haptic feedback                      |
-| Vibration Motor 4          | GPIO 14              | Digital Output       | Rear-right haptic feedback                     |
-| LED Indicator              | GPIO 12              | Digital Output       | Visual posture alert                           |
-| Buzzer                     | GPIO 23              | Digital Output       | Audio alert                                    |
+The following table provides the complete GPIO pin assignment for the ESP32 38-pin development board. Pin selection avoids GPIO 0, 1, 6–11 (flash interface), and other pins with special boot behaviours.
 
-**Note**: GPIO 34-39 are input-only pins and cannot be used for output. They are ideal for analog sensor readings. GPIO 21/22 and 32/33 are used for HX711 digital communication and must not be connected to I²C or ADC peripherals simultaneously.
+| **Component**               | **ESP32 GPIO** | **ADC Channel**      | **Direction** | **Dedicated Feedback Actuator**              | **Notes**                                    |
+|-----------------------------|----------------|----------------------|---------------|----------------------------------------------|----------------------------------------------|
+| Flex Sensor 1               | GPIO 34        | ADC1_CH6             | Input only    | —                                            | Backrest curvature – input-only pin          |
+| Flex Sensor 2               | GPIO 35        | ADC1_CH7             | Input only    | —                                            | Backrest curvature – input-only pin          |
+| Flex Sensor 3               | GPIO 36 (SVP)  | ADC1_CH0             | Input only    | —                                            | Backrest curvature – input-only pin          |
+| Flex Sensor 4               | GPIO 39 (VN)   | ADC1_CH3             | Input only    | —                                            | Backrest curvature – input-only pin          |
+| FSR – Rear-Right (RR)       | GPIO 32        | ADC1_CH4             | Input only    | VIBRATION_PIN  (GPIO 19) – Vibration Motor 1 | Seat quadrant pressure                       |
+| FSR – Rear-Left (RL)        | GPIO 33        | ADC1_CH5             | Input only    | VIBRATION_PIN2 (GPIO 18) – Vibration Motor 2 | Seat quadrant pressure                       |
+| FSR – Front-Right (FR)      | GPIO 25        | ADC2_CH8 ¹           | Input only    | VIBRATION_PIN3 (GPIO 13) – Vibration Motor 3 | Seat quadrant pressure                       |
+| FSR – Front-Left (FL)       | GPIO 26        | ADC2_CH9 ¹           | Input only    | VIBRATION_PIN4 (GPIO 14) – Vibration Motor 4 | Seat quadrant pressure                       |
+| FSR – Center (CTR)          | GPIO 27        | ADC2_CH7 ¹           | Input only    | LED_PIN        (GPIO 12) – LED indicator     | Center seat zone / forward-lean detection    |
+| Vibration Motor 1 (RR)      | GPIO 19        | —                    | Output        | ← FSR_RR                                     | Haptic alert – rear-right quadrant           |
+| Vibration Motor 2 (RL)      | GPIO 18        | —                    | Output        | ← FSR_RL                                     | Haptic alert – rear-left quadrant            |
+| Vibration Motor 3 (FR)      | GPIO 13        | —                    | Output        | ← FSR_FR                                     | Haptic alert – front-right quadrant          |
+| Vibration Motor 4 (FL)      | GPIO 14        | —                    | Output        | ← FSR_FL                                     | Haptic alert – front-left quadrant           |
+| LED Indicator               | GPIO 12        | —                    | Output        | ← FSR_CTR                                    | Visual alert – center zone pressure          |
+| Buzzer                      | GPIO 23        | —                    | Output        | ← Any Flex > threshold                       | Auditory alert – backrest posture correction |
+
+¹ ADC2 pins (GPIO 25/26/27) conflict with the ESP32 WiFi radio. They are safe for analog input when WiFi is not initialised (current firmware has no WiFi).
+
+**Voltage Divider Circuit (FSR and Flex sensors):**
+```
+VCC (3.3 V)
+    │
+ [R_pull = 10 kΩ]
+    │
+    ├──── GPIO (ADC input)
+    │
+ [Sensor] (FSR or Flex – variable resistance)
+    │
+   GND
+```
+As the sensor resistance decreases under load/bend, the ADC voltage—and therefore the 12-bit reading (0–4095)—increases.
 
 ---
 
