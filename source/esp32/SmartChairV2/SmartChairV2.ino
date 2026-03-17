@@ -67,10 +67,16 @@
 //
 // A sitting check gates balance logic so the chair is silent when empty.
 // Balance alerts fire on the heavier side when paired sensors differ by > BALANCE_THRESHOLD %.
-// Backrest alerts fire when any flex sensor exceeds FLEX_PCT_THRESHOLD %.
-#define SITTING_THRESHOLD   25   // % average seat load → someone is sitting
-#define BALANCE_THRESHOLD   20   // % difference between paired FSRs → imbalance vibration
-#define FLEX_PCT_THRESHOLD  10   // % flex bend from tare → backrest / buzzer alert
+// Backrest balance: Left group (Flex1+Flex3) vs Right group (Flex2+Flex4).
+//   If the group delta sums differ by > FLEX_BALANCE_THRESHOLD ADC counts → Vib5+buzzer.
+#define SITTING_THRESHOLD      25   // % average seat load → someone is sitting
+#define BALANCE_THRESHOLD      20   // % difference between paired FSRs → imbalance vibration
+#define FLEX_PCT_THRESHOLD     10   // % flex bend from tare → diagnostic display
+#define FLEX_NOISE_FLOOR        8   // ADC counts: delta below this is electrical noise; ignored
+#define FLEX_ADC_THRESHOLD     20   // ADC count drop from tare per sensor (used in flexActive)
+#define FLEX_BALANCE_THRESHOLD 15   // ADC count difference between Left(Flex1+Flex3) and
+                                    // Right(Flex2+Flex4) group sums → backrest balance alert
+                                    // Lower = more sensitive; raise if false triggers occur
 
 // ── Beep / Pulse Configuration ────────────────────────────────────────────────
 // Buzzer and vibration motors pulse ON/OFF instead of staying continuously active.
@@ -82,6 +88,12 @@
 float emaFsr[5]  = { 0, 0, 0, 0, 0 };  // filtered FSR values
 float emaFlex[4] = { 0, 0, 0, 0 };     // filtered flex values
 bool  emaInit    = false;               // seed EMA on first loop pass
+
+// ── Flex Adaptive Range (per-sensor running minimum) ──────────────────────────
+// Seeded to flexTare[] at tare time; decremented whenever a deeper bend is seen.
+// Once the range spans > FLEX_NOISE_FLOOR counts, flexPct is auto-scaled so that
+// 0% = straight (tare) and 100% = deepest bend observed since last tare.
+float flexRangeMin[4] = { 0, 0, 0, 0 };
 
 // ── Boot-time Tare (no-load baseline) ─────────────────────────────────────────
 // Captured in setup() with the chair empty. Load/bend is computed as the DELTA
@@ -215,7 +227,8 @@ void setup() {
       Serial.print(F(" tare: ")); Serial.println(fsrTare[i], 0);
     }
     for (uint8_t i = 0; i < 4; i++) {
-      flexTare[i] = (float)averagedRead(xp[i], 16);
+      flexTare[i]     = (float)averagedRead(xp[i], 16);
+      flexRangeMin[i] = flexTare[i];  // seed adaptive range minimum to tare value
       Serial.print(F("  Flex")); Serial.print(i + 1);
       Serial.print(F(" tare: ")); Serial.println(flexTare[i], 0);
     }
@@ -314,7 +327,8 @@ void loop() {
         Serial.print(F(" tare: ")); Serial.println(fsrTare[i], 0);
       }
       for (uint8_t i = 0; i < 4; i++) {
-        flexTare[i] = (float)averagedRead(xp[i], 16);
+        flexTare[i]     = (float)averagedRead(xp[i], 16);
+        flexRangeMin[i] = flexTare[i];  // reset adaptive range minimum on re-tare
         Serial.print(F("  Flex")); Serial.print(i + 1);
         Serial.print(F(" tare: ")); Serial.println(flexTare[i], 0);
       }
@@ -430,10 +444,34 @@ void loop() {
     fsrPct[i]  = (fsrTare[i]  > 0.0f)
                  ? constrain((fsrTare[i]  - emaFsr[i])  / fsrTare[i]  * 100.0f, 0.0f, 100.0f)
                  : 0.0f;
+  // ── Flex absolute delta + adaptive auto-range ─────────────────────────────
+  // Update per-sensor running minimum (deepest bend seen since last tare).
   for (uint8_t i = 0; i < 4; i++)
-    flexPct[i] = (flexTare[i] > 0.0f)
-                 ? constrain((flexTare[i] - emaFlex[i]) / flexTare[i] * 100.0f, 0.0f, 100.0f)
-                 : 0.0f;
+    if (emaFlex[i] < flexRangeMin[i]) flexRangeMin[i] = emaFlex[i];
+
+  // flexDelta[i]: ADC count drop from tare with noise-floor deadband.
+  // Using an absolute count sidesteps the large-denominator problem that
+  // limits tare-relative percentages to ~1-3% even on noticeable bends.
+  float flexDelta[4];
+  for (uint8_t i = 0; i < 4; i++) {
+    float d      = flexTare[i] - emaFlex[i];
+    flexDelta[i] = (d >= (float)FLEX_NOISE_FLOOR) ? d : 0.0f;
+  }
+
+  // flexPct[i]: auto-scaled to the widest bend observed since last tare.
+  // Once span > FLEX_NOISE_FLOOR, 0% = straight, 100% = deepest-ever bend,
+  // giving meaningful diagnostics at any physical sensitivity level.
+  // Before any bend is recorded the original tare-relative % is used as fallback.
+  for (uint8_t i = 0; i < 4; i++) {
+    if (flexTare[i] <= 0.0f) { flexPct[i] = 0.0f; continue; }
+    float span = flexTare[i] - flexRangeMin[i];
+    flexPct[i] = constrain(
+      (span > (float)FLEX_NOISE_FLOOR)
+        ? flexDelta[i] / span       * 100.0f   // auto-ranged: reliable 0-100 %
+        : flexDelta[i] / flexTare[i] * 100.0f, // fallback before range is learned
+      0.0f, 100.0f
+    );
+  }
 
   // ── Flex sensor timed test output ─────────────────────────────────────────────
   {
@@ -471,8 +509,15 @@ void loop() {
     Serial.print("Flex: ");
     for (uint8_t i = 0; i < 4; i++) {
       Serial.print(flexPct[i], 1);
-      Serial.print(i < 3 ? "%  " : "%\n");
+      Serial.print(i < 3 ? "%  " : "%");
     }
+    // Group balance diagnostic: Left = Flex1+Flex3, Right = Flex2+Flex4
+    float pL = flexDelta[0] + flexDelta[2];
+    float pR = flexDelta[1] + flexDelta[3];
+    Serial.print("  | L-grp:"); Serial.print(pL, 0);
+    Serial.print(" R-grp:");    Serial.print(pR, 0);
+    Serial.print(" diff:");     Serial.print(fabsf(pL - pR), 0);
+    Serial.print(" ALERT:");    Serial.println(fabsf(pL - pR) >= FLEX_BALANCE_THRESHOLD ? "YES" : "no");
     lastSensorPrintTime = millis();
   }
 
@@ -580,11 +625,22 @@ void loop() {
   // Middle seat zone → red LED (sitting indicator, stays solid)
   digitalWrite(RED_LED_PIN, isSitting ? HIGH : LOW);
 
-  // Backrest posture → buzzer + Vib5 + green LED
-  bool backrestAlert = (flexPct[0] > FLEX_PCT_THRESHOLD ||
-                        flexPct[1] > FLEX_PCT_THRESHOLD ||
-                        flexPct[2] > FLEX_PCT_THRESHOLD ||
-                        flexPct[3] > FLEX_PCT_THRESHOLD);
+  // Backrest left / right group balance → buzzer + Vib5 + green LED
+  //
+  // Sensor layout:
+  //   Left  group : Flex1 (index 0, bottom-left) + Flex3 (index 2, top-left)
+  //   Right group : Flex2 (index 1, top-right)   + Flex4 (index 3, bottom-right)
+  //
+  // flexDelta[i] is the noise-deadbanded ADC drop from tare (0 when within noise floor).
+  // Summing each group and comparing the absolute difference against FLEX_BALANCE_THRESHOLD
+  // detects left/right lean without firing on symmetric full-back bends.
+  bool flexActive[4];
+  for (uint8_t i = 0; i < 4; i++)
+    flexActive[i] = (flexDelta[i] >= (float)FLEX_ADC_THRESHOLD);
+
+  float groupLeft  = flexDelta[0] + flexDelta[2];   // Flex1 + Flex3 (left side)
+  float groupRight = flexDelta[1] + flexDelta[3];   // Flex2 + Flex4 (right side)
+  bool  backrestAlert = fabsf(groupLeft - groupRight) >= (float)FLEX_BALANCE_THRESHOLD;
   digitalWrite(BUZZER_PIN,    backrestAlert && beepOn ? HIGH : LOW);   // pulsed
   digitalWrite(GREEN_LED_PIN, backrestAlert ? HIGH : LOW);              // stays solid
   if (controlMode == AUTO) {
