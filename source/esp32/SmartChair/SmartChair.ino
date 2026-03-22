@@ -20,6 +20,7 @@
 // ═══════════════════════════════════════════════════════════════════════════════
 
 #include <Arduino.h>
+#include <SPIFFS.h>
 
 // ── Actuator Pins ─────────────────────────────────────────────────────────────
 #define BUZZER_PIN      23   // Backrest-posture audio alert
@@ -144,12 +145,35 @@ const uint8_t vibrationPins[5] = {
 // TEST   : dedicated motor test active; posture feedback suppressed
 enum ControlMode { AUTO, MANUAL, TEST };
 ControlMode controlMode = AUTO;
+// ── User Profile System ──────────────────────────────────────────────────────
+// Up to 5 user profiles (ID 0–4), each storing per-user calibration baselines.
+// Profiles are persisted to SPIFFS as binary files: /user0.dat … /user4.dat.
+// The active user's tare values are loaded into the global fsrTare[], flexTare[],
+// and flexRangeMin[] arrays so all existing posture logic works unchanged.
+#define MAX_USERS 5
 
+struct UserProfile {
+  float fsrTare[5];
+  float flexTare[4];
+  float flexRangeMin[4];
+};
+
+uint8_t currentUserID = 0;   // active user (0–4), default = 0
 // ── Button Debounce State ─────────────────────────────────────────────────────
 #define DEBOUNCE_MS       50
 bool          btn1Raw      = HIGH, btn2Raw      = HIGH;
 bool          btn1Stable   = HIGH, btn2Stable   = HIGH;
 unsigned long btn1ChangeAt = 0,    btn2ChangeAt = 0;
+
+// ── Button Press-Timing State (User Profile Control) ─────────────────────────
+// Button1 SHORT press (<500 ms)  → cycle to next user profile
+// Button2 LONG  press (≥2000 ms) → calibrate + save current user profile
+#define BTN_SHORT_PRESS_MS  500    // max duration considered a short press
+#define BTN_LONG_PRESS_MS  2000   // min duration to trigger calibration
+
+unsigned long btn1PressAt    = 0;   // millis() when Button1 went LOW (stable)
+unsigned long btn2PressAt    = 0;   // millis() when Button2 went LOW (stable)
+bool          btn2CalibDone  = false;  // prevents re-triggering during one long press
 
 // ─────────────────────────────────────────────────────────────────────────────
 // averagedRead()
@@ -190,6 +214,56 @@ void handleVibrationCommand(int motorIndex, bool state) {
   digitalWrite(vibrationPins[motorIndex - 1], state ? HIGH : LOW);
   Serial.print(F("Vibration")); Serial.print(motorIndex);
   Serial.println(state ? F(" ON") : F(" OFF"));
+}
+
+// ── User Profile Storage Functions ────────────────────────────────────────────
+
+// Build the SPIFFS path for a given user ID: "/user0.dat" … "/user4.dat"
+static void profilePath(uint8_t id, char* buf, size_t len) {
+  snprintf(buf, len, "/user%u.dat", id);
+}
+
+// Returns true if a saved profile exists for the given user ID.
+bool profileExists(uint8_t id) {
+  if (id >= MAX_USERS) return false;
+  char path[16];
+  profilePath(id, path, sizeof(path));
+  return SPIFFS.exists(path);
+}
+
+// Save the current global tare values as a binary profile for the given user ID.
+void saveUserProfile(uint8_t id) {
+  if (id >= MAX_USERS) { Serial.println(F("Invalid user ID.")); return; }
+  char path[16];
+  profilePath(id, path, sizeof(path));
+  File f = SPIFFS.open(path, FILE_WRITE);
+  if (!f) { Serial.println(F("Profile save failed (SPIFFS).")); return; }
+  UserProfile p;
+  memcpy(p.fsrTare,     fsrTare,     sizeof(p.fsrTare));
+  memcpy(p.flexTare,    flexTare,    sizeof(p.flexTare));
+  memcpy(p.flexRangeMin,flexRangeMin,sizeof(p.flexRangeMin));
+  f.write((const uint8_t*)&p, sizeof(p));
+  f.close();
+  Serial.print(F("Profile saved for User ")); Serial.println(id);
+}
+
+// Load a binary profile for the given user ID into the global tare arrays.
+// Returns true on success, false if the file does not exist or read fails.
+bool loadUserProfile(uint8_t id) {
+  if (id >= MAX_USERS) return false;
+  char path[16];
+  profilePath(id, path, sizeof(path));
+  if (!SPIFFS.exists(path)) return false;
+  File f = SPIFFS.open(path, FILE_READ);
+  if (!f) return false;
+  UserProfile p;
+  size_t n = f.read((uint8_t*)&p, sizeof(p));
+  f.close();
+  if (n != sizeof(p)) return false;
+  memcpy(fsrTare,     p.fsrTare,     sizeof(fsrTare));
+  memcpy(flexTare,    p.flexTare,    sizeof(flexTare));
+  memcpy(flexRangeMin,p.flexRangeMin,sizeof(flexRangeMin));
+  return true;
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════
@@ -235,6 +309,18 @@ void setup() {
   }
   Serial.println(F("Tare complete. Chair is ready."));
 
+  // ── SPIFFS init + attempt to load User 0 profile ────────────────────────────
+  if (!SPIFFS.begin(true)) {
+    Serial.println(F("SPIFFS mount failed – profiles disabled."));
+  } else {
+    if (loadUserProfile(0)) {
+      Serial.println(F("User 0 profile loaded."));
+    } else {
+      Serial.println(F("No saved profile for User 0 – using boot tare."));
+    }
+  }
+  Serial.print(F("Active User: ")); Serial.println(currentUserID);
+
   Serial.println(F("\n── Serial Command Reference ────────────────────────────────"));
   Serial.println(F("  Actuators : buzzer on/off | red led on/off | green led on/off"));
   Serial.println(F("              vib <1-5> on/off | vib all on/off | vib auto"));
@@ -243,6 +329,7 @@ void setup() {
   Serial.println(F("  FSR test  : test fsr <right|left|front|back|mid>"));
   Serial.println(F("  Vib test  : test vibration <1|2|3|4|5|all>  (10 s; others off)"));
   Serial.println(F("  Logging   : log start | log stop | log rate <ms> | label <name>"));
+  Serial.println(F("  Profiles  : user <0-4> | calibrate | save user | list users"));
   Serial.println(F("────────────────────────────────────────────────────────────\n"));
 }
 
@@ -262,10 +349,64 @@ void loop() {
     if ((now - btn1ChangeAt >= DEBOUNCE_MS) && (btn1Raw != btn1Stable)) {
       btn1Stable = btn1Raw;
       Serial.println(btn1Stable == LOW ? "Button1 pressed." : "Button1 released.");
+      // ── Record press start time ──────────────────────────────────────────
+      if (btn1Stable == LOW) btn1PressAt = now;
     }
     if ((now - btn2ChangeAt >= DEBOUNCE_MS) && (btn2Raw != btn2Stable)) {
       btn2Stable = btn2Raw;
       Serial.println(btn2Stable == LOW ? "Button2 pressed." : "Button2 released.");
+      // ── Record press start / reset long-press flag on release ────────────
+      if (btn2Stable == LOW)  { btn2PressAt = now; btn2CalibDone = false; }
+    }
+  }
+
+  // ── Button1: short press → cycle to next user ─────────────────────────────
+  // Detected on release so we can measure duration accurately.
+  {
+    static bool btn1WasLow = false;
+    if (btn1Stable == LOW) {
+      btn1WasLow = true;
+    } else if (btn1WasLow) {
+      // Button just released
+      btn1WasLow = false;
+      unsigned long pressDuration = millis() - btn1PressAt;
+      if (pressDuration < BTN_SHORT_PRESS_MS) {
+        // Cycle to next user (0→1→2→3→4→0)
+        currentUserID = (currentUserID + 1) % MAX_USERS;
+        Serial.print(F("Active User: ")); Serial.println(currentUserID);
+        if (loadUserProfile(currentUserID)) {
+          Serial.println(F("Profile loaded."));
+        } else {
+          Serial.print(F("User ")); Serial.print(currentUserID);
+          Serial.println(F(" not calibrated."));
+        }
+        emaInit = false;  // re-seed EMA after tare change
+      }
+    }
+  }
+
+  // ── Button2: long press (≥2 s) → calibrate current user ──────────────────
+  // Triggered while still held so there is no wait on release.
+  {
+    if (btn2Stable == LOW && !btn2CalibDone) {
+      if ((millis() - btn2PressAt) >= BTN_LONG_PRESS_MS) {
+        btn2CalibDone = true;  // arm: fire exactly once per press
+        Serial.print(F("Calibrating User ")); Serial.print(currentUserID);
+        Serial.println(F(" (button)..."));
+        const uint8_t fp[5] = { FSR_RIGHT_PIN, FSR_LEFT_PIN, FSR_FRONT_PIN,
+                                 FSR_BACK_PIN, FSR_MIDDLE_PIN };
+        const uint8_t xp[4] = { FLEX_PIN1, FLEX_PIN2, FLEX_PIN3, FLEX_PIN4 };
+        for (uint8_t i = 0; i < 5; i++) {
+          fsrTare[i] = (float)averagedRead(fp[i], 32);
+        }
+        for (uint8_t i = 0; i < 4; i++) {
+          flexTare[i]     = (float)averagedRead(xp[i], 16);
+          flexRangeMin[i] = flexTare[i];
+        }
+        saveUserProfile(currentUserID);
+        Serial.println(F("Calibration saved."));
+        emaInit = false;  // re-seed EMA after tare change
+      }
     }
   }
 
@@ -317,6 +458,7 @@ void loop() {
     // ── Re-tare on command ─────────────────────────────────────────────────────
     // Re-captures no-load baselines live, without a reboot.
     // Ensure the chair is empty before sending this command.
+    // Saves updated tare values to the current user's SPIFFS profile.
     else if (command == "retare") {
       Serial.println(F("Re-taring – keep chair empty..."));
       const uint8_t fp[5] = { FSR_RIGHT_PIN, FSR_LEFT_PIN, FSR_FRONT_PIN, FSR_BACK_PIN, FSR_MIDDLE_PIN };
@@ -332,6 +474,7 @@ void loop() {
         Serial.print(F("  Flex")); Serial.print(i + 1);
         Serial.print(F(" tare: ")); Serial.println(flexTare[i], 0);
       }
+      saveUserProfile(currentUserID);
       Serial.println(F("Re-tare complete."));
     }
 
@@ -401,6 +544,62 @@ void loop() {
       lbl.trim();
       lbl.toCharArray(logLabel, sizeof(logLabel));
       Serial.print("Label set to: "); Serial.println(logLabel);
+    }
+
+    // ── User Profile Commands ────────────────────────────────────────────────
+    // Select active user: "user 0" … "user 4"
+    else if (command.startsWith("user ") && command.length() >= 6
+             && command.charAt(5) >= '0' && command.charAt(5) <= '4') {
+      uint8_t id = command.charAt(5) - '0';
+      currentUserID = id;
+      if (loadUserProfile(id)) {
+        Serial.print(F("Active User: ")); Serial.println(id);
+        Serial.println(F("Profile loaded."));
+      } else {
+        Serial.print(F("Active User: ")); Serial.println(id);
+        Serial.println(F("User not calibrated."));
+      }
+      emaInit = false;  // re-seed EMA after tare change
+    }
+
+    // Calibrate current user: live sensor tare + save to SPIFFS
+    else if (command == "calibrate") {
+      Serial.print(F("Calibrating User ")); Serial.print(currentUserID);
+      Serial.println(F(" – keep chair empty..."));
+      const uint8_t fp[5] = { FSR_RIGHT_PIN, FSR_LEFT_PIN, FSR_FRONT_PIN, FSR_BACK_PIN, FSR_MIDDLE_PIN };
+      const uint8_t xp[4] = { FLEX_PIN1, FLEX_PIN2, FLEX_PIN3, FLEX_PIN4 };
+      for (uint8_t i = 0; i < 5; i++) {
+        fsrTare[i] = (float)averagedRead(fp[i], 32);
+        Serial.print(F("  FSR")); Serial.print(i + 1);
+        Serial.print(F(" tare: ")); Serial.println(fsrTare[i], 0);
+      }
+      for (uint8_t i = 0; i < 4; i++) {
+        flexTare[i]     = (float)averagedRead(xp[i], 16);
+        flexRangeMin[i] = flexTare[i];
+        Serial.print(F("  Flex")); Serial.print(i + 1);
+        Serial.print(F(" tare: ")); Serial.println(flexTare[i], 0);
+      }
+      saveUserProfile(currentUserID);
+      Serial.println(F("Calibration complete."));
+      emaInit = false;  // re-seed EMA after tare change
+    }
+
+    // Explicitly save current user profile
+    else if (command == "save user") {
+      saveUserProfile(currentUserID);
+    }
+
+    // List which user profiles exist on SPIFFS
+    else if (command == "list users") {
+      Serial.println(F("── User Profiles ──"));
+      for (uint8_t i = 0; i < MAX_USERS; i++) {
+        Serial.print(F("  User ")); Serial.print(i);
+        Serial.print(F(": "));
+        Serial.print(profileExists(i) ? F("saved") : F("empty"));
+        if (i == currentUserID) Serial.print(F("  [active]"));
+        Serial.println();
+      }
+      Serial.println(F("────────────────────"));
     }
 
     else { Serial.println("Unknown command."); }
